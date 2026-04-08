@@ -21,13 +21,19 @@
       z-index:10; text-align:center; padding:48px; gap:10px;
     }
     #ui .lang { font-size:11px; color:#555; letter-spacing:0.2em; }
-    #ui h1 { font-size:15px; letter-spacing:0.06em; font-weight:normal; color:#eee; }
-    #ui p { font-size:11px; color:#666; line-height:1.9; margin-top:4px; }
+    #ui h1 { font-size:15px; font-weight:normal; color:#eee; margin-top:6px; }
+    #ui p { font-size:11px; color:#666; line-height:1.9; margin-top:8px; }
     #enter {
-      margin-top:28px; padding:13px 36px;
+      margin-top:32px; padding:14px 40px;
       background:#E8503A; color:#fff; border:none;
       font-family:monospace; font-size:11px;
       letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
+    }
+    #debug {
+      position:fixed; top:8px; left:8px;
+      font-family:monospace; font-size:10px;
+      color:rgba(255,255,0,0.7); z-index:20;
+      pointer-events:none; line-height:1.6;
     }
     #hint {
       position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
@@ -46,8 +52,11 @@
   <p>Turn your body slowly.<br>Language floats all around you.</p>
   <button id="enter" onclick="startAR()">Enter ↗</button>
 </div>
+<div id="debug" id="debug"></div>
 <div id="hint">turn slowly to explore ↻</div>
+
 <script>
+// ── ASSETS ──────────────────────────────────────────────
 const ASSETS = [
   'toronto.png','WO.png','BAI.png','beijing.png',
   'blue-bubble.png','blue-strip.png','BU.png',
@@ -57,140 +66,238 @@ const ASSETS = [
   'MING.png','montreal.png','red-bubble.png','SOS3.png'
 ];
 
-const COUNT    = 50;
-const MIN_DIST = 200;
-const MAX_DIST = 700;
-const BASE_SIZE= 180;
-const FOV      = 500;
-const BOB_SPD  = 0.0006;
-const BOB_AMT  = 18;
+// ── CONFIG ──────────────────────────────────────────────
+const COUNT     = 40;
+const MIN_DIST  = 250;
+const MAX_DIST  = 800;
+const BASE_W    = 140;   // reference display width at dist=400
+const FOV       = 450;
+const BOB_SPD   = 0.4;   // radians per second (slow breath)
+const BOB_AMT   = 22;    // px at reference distance
 
-let canvas, ctx, imgs=[], particles=[], yaw=0, pitch=0, t=0, lastAlpha=null;
+// ── GLOBALS ─────────────────────────────────────────────
+let canvas, ctx;
+let imgs = [];
+let particles = [];
+let camYaw = 0;    // horizontal: how far viewer has turned left/right
+let camPitch = 0;  // vertical tilt
+let gyroAlpha0 = null; // reference alpha when we started
+let t = 0;
+let lastTime = 0;
 
+// ── START ────────────────────────────────────────────────
 async function startAR() {
-  document.getElementById('ui').style.display='none';
-  canvas=document.getElementById('ar-canvas');
-  ctx=canvas.getContext('2d');
+  document.getElementById('ui').style.display = 'none';
+
+  canvas = document.getElementById('ar-canvas');
+  // enable image smoothing for quality
+  ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
   onResize();
   window.addEventListener('resize', onResize);
 
+  // camera
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:'environment'}}, audio:false
+      video: { facingMode: { ideal:'environment' }, width:{ideal:1920}, height:{ideal:1080} },
+      audio: false
     });
-    document.getElementById('camera').srcObject=stream;
+    document.getElementById('camera').srcObject = stream;
   } catch(e) {
-    document.getElementById('camera').style.display='none';
+    document.getElementById('camera').style.display = 'none';
   }
 
-  // gyro requested inside button tap — iOS needs this
-  await requestGyro();
+  // gyro — called inside button tap so iOS permission dialog fires
+  await setupGyro();
 
-  imgs = (await Promise.all(ASSETS.map(name=>new Promise(res=>{
-    const img=new Image();
-    img.onload=()=>res(img);
-    img.onerror=()=>res(null);
-    img.src='./assets/'+name;
+  // load images
+  imgs = (await Promise.all(ASSETS.map(name => new Promise(res => {
+    const img = new Image();
+    img.onload  = () => res(img);
+    img.onerror = () => res(null);
+    img.src = './assets/' + name;
   })))).filter(Boolean);
 
   spawnParticles();
   requestAnimationFrame(loop);
 }
 
-function requestGyro() {
-  return new Promise(resolve=>{
-    if(typeof DeviceOrientationEvent==='undefined'){resolve();return;}
-    const attach=()=>{
-      window.addEventListener('deviceorientation', onOrientation);
+// ── GYRO SETUP ──────────────────────────────────────────
+// Key insight: use ABSOLUTE alpha, not delta.
+// We record alpha when the experience starts as the "zero" reference.
+// Then camYaw = -(currentAlpha - referenceAlpha), which means
+// turning right (alpha increases) moves view right naturally.
+
+function setupGyro() {
+  return new Promise(resolve => {
+    if (typeof DeviceOrientationEvent === 'undefined') {
+      resolve();
+      return;
+    }
+
+    const attachListener = () => {
+      let firstEvent = true;
+      window.addEventListener('deviceorientation', e => {
+        if (e.alpha === null || e.alpha === undefined) return;
+
+        // capture reference on first event
+        if (firstEvent) {
+          gyroAlpha0 = e.alpha;
+          firstEvent = false;
+        }
+
+        // absolute yaw relative to start orientation
+        let deltaAlpha = e.alpha - gyroAlpha0;
+        // normalise to -180..+180
+        if (deltaAlpha >  180) deltaAlpha -= 360;
+        if (deltaAlpha < -180) deltaAlpha += 360;
+        // convert to radians, invert so turning right = positive yaw
+        camYaw = -deltaAlpha * Math.PI / 180;
+
+        // pitch: beta = device tilt. Holding phone upright = ~90deg.
+        // tilt up = beta decreases. Map to small pitch offset.
+        const betaDeg = e.beta || 0;
+        camPitch = (betaDeg - 75) * Math.PI / 180 * 0.25;
+
+        // debug
+        const dbg = document.getElementById('debug');
+        if (dbg) dbg.textContent =
+          `α:${e.alpha.toFixed(1)}° Δ:${deltaAlpha.toFixed(1)}° yaw:${(camYaw*180/Math.PI).toFixed(1)}°`;
+      });
       resolve();
     };
-    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // iOS 13+
       DeviceOrientationEvent.requestPermission()
-        .then(s=>{if(s==='granted')attach();else resolve();})
-        .catch(()=>resolve());
-    } else { attach(); }
+        .then(state => {
+          if (state === 'granted') attachListener();
+          else resolve();
+        })
+        .catch(() => resolve());
+    } else {
+      attachListener();
+    }
   });
 }
 
-function onOrientation(e) {
-  if(e.alpha===null) return;
-  const a = e.alpha * Math.PI/180;
-  if(lastAlpha!==null){
-    let d=a-lastAlpha;
-    if(d> Math.PI) d-=2*Math.PI;
-    if(d<-Math.PI) d+=2*Math.PI;
-    yaw-=d;
-  }
-  lastAlpha=a;
-  pitch=((e.beta||0)-90)*Math.PI/180*0.35;
-}
-
+// ── PARTICLES ───────────────────────────────────────────
 function spawnParticles() {
-  particles=[];
-  for(let i=0;i<COUNT;i++){
-    const theta=Math.random()*Math.PI*2;
-    const phi=(Math.random()-0.5)*Math.PI*0.85;
-    const dist=MIN_DIST+Math.random()*(MAX_DIST-MIN_DIST);
-    const x=dist*Math.cos(phi)*Math.sin(theta);
-    const y=dist*Math.sin(phi);
-    const z=dist*Math.cos(phi)*Math.cos(theta);
-    const img=imgs.length ? imgs[i%imgs.length] : null;
-    const ratio=img ? img.naturalHeight/img.naturalWidth : 0.75;
-    const w=BASE_SIZE*(0.5+Math.random()*1.0);
+  particles = [];
+  for (let i = 0; i < COUNT; i++) {
+    // random direction in full 360° horizontal, limited vertical spread
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = (Math.random() - 0.5) * Math.PI * 0.7; // ±63° vertical
+    const dist  = MIN_DIST + Math.random() * (MAX_DIST - MIN_DIST);
+
+    // world-space position (viewer at origin, Z = forward)
+    const x = dist * Math.cos(phi) * Math.sin(theta);
+    const y = dist * Math.sin(phi);
+    const z = dist * Math.cos(phi) * Math.cos(theta);
+
+    const img = imgs.length ? imgs[i % imgs.length] : null;
+    const nativeRatio = img ? img.naturalHeight / img.naturalWidth : 0.75;
+
+    // display size: based on BASE_W scaled by reference distance
+    // so near elements are bigger, far are smaller — but we'll also
+    // apply perspective on top, so actual size = displayW * (FOV/depth)
+    const sizeVariance = 0.55 + Math.random() * 0.9;
+    const displayW = BASE_W * sizeVariance * (400 / dist); // pre-scale by dist
+    const displayH = displayW * nativeRatio;
+
     particles.push({
-      img, w, h:w*ratio, x, y, z,
-      bobPhase:Math.random()*Math.PI*2,
-      bobY:Math.random()<0.7,
-      tilt:(Math.random()-0.5)*0.3,
+      img,
+      displayW, displayH,
+      x, y, z,
+      bobPhase : Math.random() * Math.PI * 2,
+      bobSpeed : 0.6 + Math.random() * 0.4, // slight variance per element
+      tilt     : (Math.random() - 0.5) * 0.28,
     });
   }
 }
 
-function onResize(){
-  if(!canvas)return;
-  canvas.width=window.innerWidth;
-  canvas.height=window.innerHeight;
+// ── RESIZE ──────────────────────────────────────────────
+function onResize() {
+  if (!canvas) return;
+  canvas.width  = window.innerWidth  * window.devicePixelRatio;
+  canvas.height = window.innerHeight * window.devicePixelRatio;
+  canvas.style.width  = window.innerWidth  + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 }
 
-function loop(){
-  t++;
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const cx=canvas.width/2, cy=canvas.height/2;
-  const cosY=Math.cos(yaw), sinY=Math.sin(yaw);
-  const cosP=Math.cos(pitch), sinP=Math.sin(pitch);
+// ── RENDER LOOP ─────────────────────────────────────────
+function loop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05); // seconds, capped
+  lastTime = timestamp;
+  t += dt;
 
-  const proj=particles.map(p=>{
-    const bob=Math.sin(t*BOB_SPD*2*Math.PI+p.bobPhase)*BOB_AMT;
-    const wx=p.x+(p.bobY?0:bob*0.3);
-    const wy=p.y+(p.bobY?bob:0);
-    const wz=p.z;
-    // yaw rotation
-    const rx= wx*cosY+wz*sinY;
-    const ry1=wy;
-    const rz1=-wx*sinY+wz*cosY;
-    // pitch rotation
-    const ry= ry1*cosP-rz1*sinP;
-    const rz= ry1*sinP+rz1*cosP;
-    const depth=rz+MAX_DIST;
-    if(depth<50)return null;
-    const scale=FOV/depth;
-    const sx=cx+rx*scale;
-    const sy=cy-ry*scale;
-    const normDist=(Math.sqrt(wx*wx+wy*wy+wz*wz)-MIN_DIST)/(MAX_DIST-MIN_DIST);
-    const alpha=Math.max(0.15, 0.95-normDist*0.5);
-    return{...p,sx,sy,scale,rz,alpha};
-  }).filter(Boolean).sort((a,b)=>b.rz-a.rz);
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  ctx.clearRect(0, 0, W, H);
 
-  proj.forEach(p=>{
-    const w=p.w*p.scale, h=p.h*p.scale;
-    if(w<8)return;
+  const cx = W / 2;
+  const cy = H / 2;
+
+  // rotation matrix components
+  const cosY = Math.cos(camYaw),   sinY = Math.sin(camYaw);
+  const cosP = Math.cos(camPitch), sinP = Math.sin(camPitch);
+
+  const projected = particles.map(p => {
+    // gentle breathing bob in world space
+    const bob = Math.sin(t * BOB_SPD * p.bobSpeed * Math.PI * 2 + p.bobPhase) * BOB_AMT;
+    const wx = p.x;
+    const wy = p.y + bob;
+    const wz = p.z;
+
+    // rotate by camera yaw (Y-axis)
+    const rx1 =  wx * cosY + wz * sinY;
+    const ry1 =  wy;
+    const rz1 = -wx * sinY + wz * cosY;
+
+    // rotate by camera pitch (X-axis)
+    const rx  =  rx1;
+    const ry  =  ry1 * cosP - rz1 * sinP;
+    const rz  =  ry1 * sinP + rz1 * cosP;
+
+    // perspective: depth = rz offset so nothing goes negative
+    const depth = rz + MAX_DIST + 100;
+    if (depth < 80) return null; // behind viewer
+
+    const scale = FOV / depth;
+    const sx = cx + rx * scale;
+    const sy = cy - ry * scale;
+
+    // only render if on-screen (with generous margin)
+    const pw = p.displayW * scale;
+    const ph = p.displayH * scale;
+    if (sx + pw < -pw || sx - pw > W + pw) return null;
+    if (sy + ph < -ph || sy - ph > H + ph) return null;
+
+    // opacity: near=opaque, far=faint
+    const normDist = (Math.hypot(wx, wy, wz) - MIN_DIST) / (MAX_DIST - MIN_DIST);
+    const alpha = 0.85 - normDist * 0.5;
+
+    return { ...p, sx, sy, scale, rz, alpha, pw, ph };
+  }).filter(Boolean).sort((a, b) => b.rz - a.rz); // far first (painter's algo)
+
+  projected.forEach(p => {
+    const w = p.pw;
+    const h = p.ph;
+    if (w < 10 || !p.img) return;
+
     ctx.save();
-    ctx.globalAlpha=p.alpha;
-    ctx.translate(p.sx,p.sy);
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
+    ctx.translate(p.sx, p.sy);
     ctx.rotate(p.tilt);
-    if(p.img) ctx.drawImage(p.img,-w/2,-h/2,w,h);
+    ctx.drawImage(p.img, -w/2, -h/2, w, h);
     ctx.restore();
   });
+
   requestAnimationFrame(loop);
 }
 </script>
