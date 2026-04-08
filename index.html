@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Between Tongues — AR</title>
+  <style>
+    * { margin:0; padding:0; }
+    body { background:#000; overflow:hidden; width:100vw; height:100vh; }
+    #ui {
+      position:fixed; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; background:#0e0e0e;
+      color:white; font-family:monospace; z-index:50; text-align:center; padding:32px;
+    }
+    #ui h1 { font-size:15px; letter-spacing:0.1em; margin-bottom:8px; }
+    #ui p { font-size:11px; color:#666; line-height:1.8; margin-bottom:24px; }
+    #ui button {
+      padding:10px 24px; background:#E8503A; color:white; border:none;
+      font-family:monospace; font-size:11px; letter-spacing:0.1em; cursor:pointer;
+    }
+    #hint {
+      position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+      font-family:monospace; font-size:10px; color:rgba(255,255,255,0.3);
+      letter-spacing:0.1em; text-transform:uppercase; pointer-events:none;
+      z-index:10;
+    }
+    canvas { display:block; }
+  </style>
+</head>
+<body>
+
+<div id="ui">
+  <h1>Between Tongues</h1>
+  <p>谁在说话 / Who's Speaking? / C'est qui?<br><br>
+  Turn your phone slowly in any direction.<br>The language space surrounds you.</p>
+  <button onclick="start()">Enter ↗</button>
+</div>
+
+<div id="hint">rotate phone to explore ↻</div>
+<canvas id="c"></canvas>
+
+<script>
+const ASSETS = ['jsuis-perdu.png', 'LUANMA.png', 'maaybe.png', 'MING.png', 'mini1.png', 'mini2.png', 'mini3.png', 'mini4.png', 'mini5.png', 'mini6.png', 'mini7.png', 'mini8.png', 'mini9.png', 'mini10.png', 'mini11.png', 'mini12.png', 'mini13.png', 'mini15.png', 'mini16.png', 'mini14.png', 'noise1.png', 'noise2.png', 'mini17.png', 'noise4.png', 'noise3.png', 'noise5.png', 'montreal.png', 'noise6.png', 'noise7.png', 'noise8.png', 'noise9.png', 'noise10.png', 'noise12.png', 'noise11.png', 'red-bubble.png', 'SOS3.png', 'toronto.png', 'wiggleEN1.png', 'wiggleEN2.png', 'wiggleEN3.png', 'wiggleFR2.png', 'wiggleFR1.png', 'BAI.png', 'YANWENZI.png', 'WO.png', 'blue-bubble.png', 'bubbleCN2.png', 'BU.png', 'bubbleCN1.png', 'bubbleCN3.png', 'bubbleEN1.png', 'bubbleEN2.png', 'bubbleCN4.png', 'bubbleEN3.png', 'bubbleEN5.png', 'bubbleEN4.png', 'bubbleFR1.png', 'bubbleFR3.png', 'bubbleFR4.png', 'etalors.png', 'bubbleFR2.png', 'emoji.png', 'green-bubble.png', 'face3.png', 'igotit.png', 'ithink.png', 'beijing.png'];
+const COUNT = 70;
+const BASE_SIZE = 40;
+const RADIUS = 280;
+const BOB_SPEED = 0.003;
+const BOB_AMT = 5;
+const OPACITY = 0.80;
+const DIST = 'sphere';
+
+let alpha=0, beta=0, gamma=0;
+let manualAngle=0, lastX=null;
+let particles=[], imgs=[], t=0;
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+
+function resize(){
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+}
+window.addEventListener('resize',()=>{ resize(); });
+resize();
+
+// Touch drag fallback
+canvas.addEventListener('touchstart',e=>{ lastX=e.touches[0].clientX; });
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const dx=e.touches[0].clientX-lastX;
+  manualAngle+=dx*0.008; lastX=e.touches[0].clientX;
+},{passive:false});
+canvas.addEventListener('mousedown',e=>lastX=e.clientX);
+canvas.addEventListener('mousemove',e=>{ if(lastX!==null){ manualAngle+=(e.clientX-lastX)*0.006; lastX=e.clientX; } });
+canvas.addEventListener('mouseup',()=>lastX=null);
+
+// Gyroscope
+function initGyro(){
+  if(typeof DeviceOrientationEvent==='undefined') return;
+  if(typeof DeviceOrientationEvent.requestPermission==='function'){
+    // iOS 13+
+    DeviceOrientationEvent.requestPermission().then(s=>{
+      if(s==='granted') window.addEventListener('deviceorientation',onOrient);
+    }).catch(()=>{});
+  } else {
+    window.addEventListener('deviceorientation',onOrient);
+  }
+}
+
+function onOrient(e){
+  alpha=((e.alpha||0)*Math.PI/180);
+  beta=((e.beta||0)*Math.PI/180);
+  gamma=((e.gamma||0)*Math.PI/180);
+}
+
+async function loadImgs(){
+  return Promise.all(ASSETS.map(name=>{
+    return new Promise(res=>{
+      const img=new Image();
+      img.onload=()=>res(img);
+      img.onerror=()=>res(null);
+      img.src='./assets/'+name;
+    });
+  }));
+}
+
+function spawnParticles(){
+  particles=[];
+  for(let i=0;i<COUNT;i++){
+    const img=imgs.filter(Boolean)[i%imgs.filter(Boolean).length];
+    if(!img) continue;
+    const ratio=img.naturalHeight/img.naturalWidth||0.7;
+    const w=BASE_SIZE*(0.7+Math.random()*0.9);
+    const h=w*ratio;
+
+    let theta,phi,r;
+    if(DIST==='ring'){
+      theta=Math.random()*Math.PI*2;
+      phi=Math.PI/2+(Math.random()-0.5)*0.4;
+      r=RADIUS*(0.9+Math.random()*0.2);
+    } else if(DIST==='cloud'){
+      theta=Math.random()*Math.PI*2;
+      phi=Math.PI/2+(Math.random()-0.5)*1.0;
+      r=RADIUS*(0.5+Math.random()*0.6);
+    } else { // sphere
+      theta=Math.random()*Math.PI*2;
+      phi=Math.acos(2*Math.random()-1);
+      r=RADIUS*(0.85+Math.random()*0.3);
+    }
+
+    particles.push({
+      img, w, h,
+      x3: r*Math.sin(phi)*Math.cos(theta),
+      y3: r*Math.cos(phi),
+      z3: r*Math.sin(phi)*Math.sin(theta),
+      bobPhase: Math.random()*Math.PI*2,
+      rot: (Math.random()-0.5)*0.35,
+    });
+  }
+}
+
+function draw(){
+  t++;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='rgba(0,0,0,0)'; // transparent — see camera feed behind
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Camera angle: gyro alpha + manual drag
+  const camY = -alpha + manualAngle;
+  const camX = beta * 0.3;
+
+  const projected = particles.map(p=>{
+    const bobY = Math.sin(t*BOB_SPEED + p.bobPhase) * BOB_AMT;
+    const cosY=Math.cos(camY), sinY=Math.sin(camY);
+    const rx = p.x3*cosY - p.z3*sinY;
+    const rz = p.x3*sinY + p.z3*cosY;
+    const ry = p.y3 + bobY;
+    const cosX=Math.cos(camX), sinX=Math.sin(camX);
+    const ry2 = ry*cosX - rz*sinX;
+    const rz2 = ry*sinX + rz*cosX;
+    const fov=500;
+    const scale=fov/(fov+rz2+400);
+    return { ...p, sx:canvas.width/2+rx*scale, sy:canvas.height/2+ry2*scale, scale, rz:rz2 };
+  }).sort((a,b)=>b.rz-a.rz);
+
+  projected.forEach(p=>{
+    if(!p.img) return;
+    const w=p.w*p.scale, h=p.h*p.scale;
+    const depth=Math.max(0.15, Math.min(1,(p.rz+RADIUS*1.2)/(RADIUS*2)));
+    ctx.save();
+    ctx.globalAlpha=OPACITY*depth;
+    ctx.translate(p.sx,p.sy);
+    ctx.rotate(p.rot);
+    ctx.drawImage(p.img,-w/2,-h/2,w,h);
+    ctx.restore();
+  });
+
+  requestAnimationFrame(draw);
+}
+
+async function start(){
+  document.getElementById('ui').style.display='none';
+  initGyro();
+  imgs=await loadImgs();
+  spawnParticles();
+  draw();
+}
+</script>
+</body>
+</html>
