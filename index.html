@@ -120,7 +120,7 @@ const CONFIG = {
   bobSpeed: 0.0008,   // how fast elements bob up/down
   bobAmount: 12,      // pixels of bob movement
   opacity: 0.92,      // element opacity
-  autoRotateSpeed: 0.0003, // very slow auto-pan
+  autoRotateSpeed: 0, // very slow auto-pan
 };
 
 // ─── STATE ───────────────────────────────────────────────
@@ -281,20 +281,12 @@ function initGyro() {
   const listen = () => {
     window.addEventListener('deviceorientation', e => {
       if(e.alpha === null) return;
-      const alphaRad = e.alpha * Math.PI / 180;
-      if(lastGyroAlpha !== null) {
-        let delta = alphaRad - lastGyroAlpha;
-        // wrap around 0/360
-        if(delta > Math.PI) delta -= Math.PI * 2;
-        if(delta < -Math.PI) delta += Math.PI * 2;
-        gyroYaw -= delta * 0.9;
-      }
-      lastGyroAlpha = alphaRad;
+      // directly use alpha as the yaw angle (0-360 degrees)
+      gyroYaw = -(e.alpha * Math.PI / 180);
     });
   };
 
   if(typeof DeviceOrientationEvent.requestPermission === 'function') {
-    // iOS 13+ needs permission — triggered by button tap already in stack
     DeviceOrientationEvent.requestPermission()
       .then(state => { if(state === 'granted') listen(); })
       .catch(() => {});
@@ -315,7 +307,7 @@ function loop() {
   t++;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const camYaw = gyroYaw + manualYaw + t * CONFIG.autoRotateSpeed;
+  const camYaw = gyroYaw + manualYaw;
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
 
@@ -327,7 +319,7 @@ function loop() {
     const pz = Math.cos(worldAngle) * p.r;
 
     // bob
-    const bobY = Math.sin(t * CONFIG.bobSpeed * (0.8 + p.bobPhase * 0.4) * 1000 + p.bobPhase) * CONFIG.bobAmount;
+    const bobY = Math.sin(t * CONFIG.bobSpeed + p.bobPhase) * CONFIG.bobAmount;
     const py = p.baseY + bobY;
 
     // perspective
