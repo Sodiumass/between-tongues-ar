@@ -7,393 +7,192 @@
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     html, body { width:100%; height:100%; overflow:hidden; background:#000; }
-
-    /* camera feed sits behind everything */
     #camera {
-      position:fixed; inset:0;
-      width:100%; height:100%;
-      object-fit:cover;
-      transform:scaleX(-1); /* mirror like a selfie */
-      z-index:0;
+      position:fixed; inset:0; width:100%; height:100%;
+      object-fit:cover; z-index:0;
     }
-
-    /* AR canvas on top of camera, transparent bg */
     #ar-canvas {
-      position:fixed; inset:0;
-      width:100%; height:100%;
-      z-index:1;
-      pointer-events:none;
+      position:fixed; inset:0; width:100%; height:100%; z-index:1;
     }
-
-    /* UI overlay */
     #ui {
-      position:fixed; inset:0;
-      display:flex; flex-direction:column;
+      position:fixed; inset:0; display:flex; flex-direction:column;
       align-items:center; justify-content:center;
-      background:rgba(0,0,0,0.92);
-      color:white; font-family:monospace;
-      z-index:10; text-align:center; padding:40px;
+      background:rgba(0,0,0,0.93); color:white; font-family:monospace;
+      z-index:10; text-align:center; padding:48px; gap:10px;
     }
-
-    #ui h1 {
-      font-size:16px; letter-spacing:0.08em;
-      margin-bottom:6px; font-weight:normal;
+    #ui .lang { font-size:11px; color:#555; letter-spacing:0.2em; }
+    #ui h1 { font-size:15px; letter-spacing:0.06em; font-weight:normal; color:#eee; }
+    #ui p { font-size:11px; color:#666; line-height:1.9; margin-top:4px; }
+    #enter {
+      margin-top:28px; padding:13px 36px;
+      background:#E8503A; color:#fff; border:none;
+      font-family:monospace; font-size:11px;
+      letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
     }
-    #ui .sub {
-      font-size:12px; color:#888; margin-bottom:6px; letter-spacing:0.05em;
-    }
-    #ui .sub2 {
-      font-size:11px; color:#555; margin-bottom:32px; line-height:1.7;
-    }
-    #ui button {
-      padding:12px 32px;
-      background:#E8503A; color:white; border:none;
-      font-family:monospace; font-size:12px;
-      letter-spacing:0.15em; text-transform:uppercase;
-      cursor:pointer; border-radius:1px;
-    }
-    #ui button:hover { background:#d44430; }
-
     #hint {
-      position:fixed; bottom:28px; left:50%;
-      transform:translateX(-50%);
-      font-family:monospace; font-size:10px;
-      color:rgba(255,255,255,0.35);
-      letter-spacing:0.12em; text-transform:uppercase;
-      z-index:5; pointer-events:none;
-      white-space:nowrap;
+      position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+      font-family:monospace; font-size:9px; color:rgba(255,255,255,0.25);
+      letter-spacing:0.15em; text-transform:uppercase;
+      z-index:5; pointer-events:none; white-space:nowrap;
     }
-
-    #loading {
-      position:fixed; inset:0;
-      display:none; align-items:center; justify-content:center;
-      background:rgba(0,0,0,0.7); z-index:9;
-      color:white; font-family:monospace; font-size:11px;
-      letter-spacing:0.1em; flex-direction:column; gap:16px;
-    }
-    .spinner {
-      width:28px; height:28px;
-      border:2px solid #333; border-top-color:#E8503A;
-      border-radius:50%; animation:spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform:rotate(360deg); } }
   </style>
 </head>
 <body>
-
 <video id="camera" autoplay playsinline muted></video>
 <canvas id="ar-canvas"></canvas>
-
 <div id="ui">
-  <div class="sub">Between Tongues</div>
-  <h1>谁在说话 / Who's Speaking? / C'est qui?</h1>
-  <div class="sub2" style="margin-top:12px;">
-    Turn slowly in any direction.<br>
-    Language surrounds you.
-  </div>
-  <button onclick="startAR()">Enter the space ↗</button>
+  <div class="lang">谁在说话 · Who's Speaking? · C'est qui?</div>
+  <h1>Between Tongues</h1>
+  <p>Turn your body slowly.<br>Language floats all around you.</p>
+  <button id="enter" onclick="startAR()">Enter ↗</button>
 </div>
-
-<div id="loading">
-  <div class="spinner"></div>
-  <span>Loading language space...</span>
-</div>
-
-<div id="hint">↻ rotate to explore all directions</div>
-
+<div id="hint">turn slowly to explore ↻</div>
 <script>
-// ─── CONFIG ──────────────────────────────────────────────
-// List your actual asset filenames here:
-const ASSETS = [];  // auto-filled below from window.AR_ASSETS if set
+const ASSETS = [
+  'toronto.png','WO.png','BAI.png','beijing.png',
+  'blue-bubble.png','blue-strip.png','BU.png',
+  'bubbleCN1.png','bubbleEN1.png','bubbleFR1.png',
+  'chinese-strip.png','english-strip.png','face3.png',
+  'green-bubble.png','igotit.png','jsuis-perdu.png',
+  'MING.png','montreal.png','red-bubble.png','SOS3.png'
+];
 
-// These will be populated from your assets/ folder
-// PASTE your filenames between the brackets, e.g.:
-// const ASSETS = ['toronto.png','WO.png','blue-bubble.png', ...];
+const COUNT    = 50;
+const MIN_DIST = 200;
+const MAX_DIST = 700;
+const BASE_SIZE= 180;
+const FOV      = 500;
+const BOB_SPD  = 0.0006;
+const BOB_AMT  = 18;
 
-const CONFIG = {
-  count: 40,          // total elements in ring
-  ringRadius: 420,    // distance from viewer (px equivalent)
-  ringLayers: 3,      // vertical layers of rings
-  layerSpread: 140,   // vertical spread between layers
-  baseSize: 120,      // base element width in px
-  sizeVariance: 0.5,  // random size variance (0-1)
-  bobSpeed: 0.0008,   // how fast elements bob up/down
-  bobAmount: 12,      // pixels of bob movement
-  opacity: 0.92,      // element opacity
-  autoRotateSpeed: 0, // very slow auto-pan
-};
+let canvas, ctx, imgs=[], particles=[], yaw=0, pitch=0, t=0, lastAlpha=null;
 
-// ─── STATE ───────────────────────────────────────────────
-let canvas, ctx, videoEl;
-let particles = [];
-let loadedImgs = [];
-let gyroYaw = 0, manualYaw = 0;
-let lastGyroAlpha = null;
-let touchStartX = null;
-let t = 0;
-let started = false;
-
-// ─── INIT ─────────────────────────────────────────────────
 async function startAR() {
-  document.getElementById('ui').style.display = 'none';
-  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('ui').style.display='none';
+  canvas=document.getElementById('ar-canvas');
+  ctx=canvas.getContext('2d');
+  onResize();
+  window.addEventListener('resize', onResize);
 
-  canvas = document.getElementById('ar-canvas');
-  ctx = canvas.getContext('2d');
-  videoEl = document.getElementById('camera');
-
-  resize();
-  window.addEventListener('resize', resize);
-
-  // 1. Camera
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width:{ideal:1280}, height:{ideal:720} },
-      audio: false
+      video:{facingMode:{ideal:'environment'}}, audio:false
     });
-    videoEl.srcObject = stream;
-    await videoEl.play();
+    document.getElementById('camera').srcObject=stream;
   } catch(e) {
-    // camera denied — use dark bg, still works
-    videoEl.style.display = 'none';
-    document.body.style.background = '#111';
+    document.getElementById('camera').style.display='none';
   }
 
-  // 2. Gyroscope
-  initGyro();
+  // gyro requested inside button tap — iOS needs this
+  await requestGyro();
 
-  // 3. Touch drag
-  canvas.style.pointerEvents = 'auto';
-  canvas.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, {passive:true});
-  canvas.addEventListener('touchmove', e => {
-    if(touchStartX === null) return;
-    const dx = e.touches[0].clientX - touchStartX;
-    manualYaw += dx * 0.007;
-    touchStartX = e.touches[0].clientX;
-  }, {passive:true});
-  canvas.addEventListener('touchend', () => touchStartX = null);
-  // mouse drag for desktop testing
-  let mouseDown = false, lastMX = 0;
-  canvas.addEventListener('mousedown', e => { mouseDown=true; lastMX=e.clientX; });
-  window.addEventListener('mousemove', e => { if(mouseDown){ manualYaw+=(e.clientX-lastMX)*0.005; lastMX=e.clientX; } });
-  window.addEventListener('mouseup', () => mouseDown=false);
+  imgs = (await Promise.all(ASSETS.map(name=>new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>res(img);
+    img.onerror=()=>res(null);
+    img.src='./assets/'+name;
+  })))).filter(Boolean);
 
-  // 4. Load images
-  const assetList = getAssetList();
-  loadedImgs = await loadImages(assetList);
-  const validImgs = loadedImgs.filter(Boolean);
-
-  if(validImgs.length === 0) {
-    // no images loaded — show placeholder text particles
-    spawnTextParticles();
-  } else {
-    spawnImageParticles(validImgs);
-  }
-
-  document.getElementById('loading').style.display = 'none';
-  started = true;
+  spawnParticles();
   requestAnimationFrame(loop);
 }
 
-// ─── ASSET LIST ──────────────────────────────────────────
-function getAssetList() {
-  if(window.AR_ASSETS && window.AR_ASSETS.length) return window.AR_ASSETS;
-  if(ASSETS.length) return ASSETS;
-  // fallback: try common names
-  return [];
+function requestGyro() {
+  return new Promise(resolve=>{
+    if(typeof DeviceOrientationEvent==='undefined'){resolve();return;}
+    const attach=()=>{
+      window.addEventListener('deviceorientation', onOrientation);
+      resolve();
+    };
+    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      DeviceOrientationEvent.requestPermission()
+        .then(s=>{if(s==='granted')attach();else resolve();})
+        .catch(()=>resolve());
+    } else { attach(); }
+  });
 }
 
-// ─── IMAGE LOADING ───────────────────────────────────────
-function loadImages(names) {
-  return Promise.all(names.map(name => new Promise(res => {
-    const img = new Image();
-    img.onload = () => res(img);
-    img.onerror = () => res(null);
-    img.src = './assets/' + name;
-  })));
-}
-
-// ─── SPAWN PARTICLES ─────────────────────────────────────
-function spawnImageParticles(imgs) {
-  particles = [];
-  const perLayer = Math.ceil(CONFIG.count / CONFIG.ringLayers);
-
-  for(let layer = 0; layer < CONFIG.ringLayers; layer++) {
-    const count = layer === 0 ? perLayer : Math.floor(perLayer * 0.7);
-    for(let i = 0; i < count; i++) {
-      const img = imgs[Math.floor(Math.random() * imgs.length)];
-      const ratio = img.naturalHeight / img.naturalWidth || 0.75;
-      const sizeScale = 0.7 + Math.random() * CONFIG.sizeVariance;
-      const w = CONFIG.baseSize * sizeScale;
-      const h = w * ratio;
-
-      // evenly distribute around 360° with slight random offset
-      const angleFraction = (i / count) + (Math.random() - 0.5) * (0.8 / count);
-      const theta = angleFraction * Math.PI * 2;
-
-      // vertical position per layer
-      const layerY = (layer - (CONFIG.ringLayers - 1) / 2) * CONFIG.layerSpread;
-      const yJitter = (Math.random() - 0.5) * 40;
-
-      // radius slight variance
-      const r = CONFIG.ringRadius * (0.85 + Math.random() * 0.3);
-
-      particles.push({
-        img,
-        w, h,
-        theta,           // angle around viewer
-        r,               // distance
-        baseY: layerY + yJitter,
-        bobPhase: Math.random() * Math.PI * 2,
-        rot: (Math.random() - 0.5) * 0.25,
-        layer,
-      });
-    }
+function onOrientation(e) {
+  if(e.alpha===null) return;
+  const a = e.alpha * Math.PI/180;
+  if(lastAlpha!==null){
+    let d=a-lastAlpha;
+    if(d> Math.PI) d-=2*Math.PI;
+    if(d<-Math.PI) d+=2*Math.PI;
+    yaw-=d;
   }
+  lastAlpha=a;
+  pitch=((e.beta||0)-90)*Math.PI/180*0.35;
 }
 
-function spawnTextParticles() {
-  // fallback if no images — show text placeholders
-  particles = [];
-  const texts = ['语言','langage','language','谁','qui','who','说','parler','speak','听','entendre','hear','间','entre','between'];
-  const colors = ['#E8503A','#4A9EBF','#8BBF3A'];
-  for(let i = 0; i < 30; i++) {
-    const theta = (i / 30) * Math.PI * 2;
+function spawnParticles() {
+  particles=[];
+  for(let i=0;i<COUNT;i++){
+    const theta=Math.random()*Math.PI*2;
+    const phi=(Math.random()-0.5)*Math.PI*0.85;
+    const dist=MIN_DIST+Math.random()*(MAX_DIST-MIN_DIST);
+    const x=dist*Math.cos(phi)*Math.sin(theta);
+    const y=dist*Math.sin(phi);
+    const z=dist*Math.cos(phi)*Math.cos(theta);
+    const img=imgs.length ? imgs[i%imgs.length] : null;
+    const ratio=img ? img.naturalHeight/img.naturalWidth : 0.75;
+    const w=BASE_SIZE*(0.5+Math.random()*1.0);
     particles.push({
-      isText: true,
-      text: texts[i % texts.length],
-      color: colors[i % 3],
-      theta,
-      r: CONFIG.ringRadius,
-      baseY: (Math.random() - 0.5) * CONFIG.layerSpread * 2,
-      bobPhase: Math.random() * Math.PI * 2,
-      w: 120, h: 50,
-      rot: (Math.random() - 0.5) * 0.2,
-      layer: 0,
+      img, w, h:w*ratio, x, y, z,
+      bobPhase:Math.random()*Math.PI*2,
+      bobY:Math.random()<0.7,
+      tilt:(Math.random()-0.5)*0.3,
     });
   }
 }
 
-// ─── GYROSCOPE ───────────────────────────────────────────
-function initGyro() {
-  if(typeof DeviceOrientationEvent === 'undefined') return;
-
-  const listen = () => {
-    window.addEventListener('deviceorientation', e => {
-      if(e.alpha === null) return;
-      // directly use alpha as the yaw angle (0-360 degrees)
-      gyroYaw = -(e.alpha * Math.PI / 180);
-    });
-  };
-
-  if(typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission()
-      .then(state => { if(state === 'granted') listen(); })
-      .catch(() => {});
-  } else {
-    listen();
-  }
+function onResize(){
+  if(!canvas)return;
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
 }
 
-// ─── RESIZE ──────────────────────────────────────────────
-function resize() {
-  if(!canvas) return;
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-
-// ─── MAIN LOOP ───────────────────────────────────────────
-function loop() {
+function loop(){
   t++;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const cx=canvas.width/2, cy=canvas.height/2;
+  const cosY=Math.cos(yaw), sinY=Math.sin(yaw);
+  const cosP=Math.cos(pitch), sinP=Math.sin(pitch);
 
-  const camYaw = gyroYaw + manualYaw;
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
+  const proj=particles.map(p=>{
+    const bob=Math.sin(t*BOB_SPD*2*Math.PI+p.bobPhase)*BOB_AMT;
+    const wx=p.x+(p.bobY?0:bob*0.3);
+    const wy=p.y+(p.bobY?bob:0);
+    const wz=p.z;
+    // yaw rotation
+    const rx= wx*cosY+wz*sinY;
+    const ry1=wy;
+    const rz1=-wx*sinY+wz*cosY;
+    // pitch rotation
+    const ry= ry1*cosP-rz1*sinP;
+    const rz= ry1*sinP+rz1*cosP;
+    const depth=rz+MAX_DIST;
+    if(depth<50)return null;
+    const scale=FOV/depth;
+    const sx=cx+rx*scale;
+    const sy=cy-ry*scale;
+    const normDist=(Math.sqrt(wx*wx+wy*wy+wz*wz)-MIN_DIST)/(MAX_DIST-MIN_DIST);
+    const alpha=Math.max(0.15, 0.95-normDist*0.5);
+    return{...p,sx,sy,scale,rz,alpha};
+  }).filter(Boolean).sort((a,b)=>b.rz-a.rz);
 
-  // project all particles, sort back→front
-  const projected = particles.map(p => {
-    // world position: ring around viewer
-    const worldAngle = p.theta + camYaw;
-    const px = Math.sin(worldAngle) * p.r;
-    const pz = Math.cos(worldAngle) * p.r;
-
-    // bob
-    const bobY = Math.sin(t * CONFIG.bobSpeed + p.bobPhase) * CONFIG.bobAmount;
-    const py = p.baseY + bobY;
-
-    // perspective
-    const fov = 500;
-    const depth = pz + CONFIG.ringRadius * 1.5;
-    const scale = fov / Math.max(depth, 50);
-
-    const sx = cx + px * scale;
-    const sy = cy + py * scale;
-
-    // depth-based opacity (elements behind viewer fade)
-    const depthFade = Math.max(0.05, Math.min(1, (pz + CONFIG.ringRadius) / (CONFIG.ringRadius * 1.2)));
-
-    return { ...p, sx, sy, scale, pz, depthFade };
-  }).sort((a, b) => b.pz - a.pz); // painter's algorithm
-
-  // draw
-  projected.forEach(p => {
-    const w = p.w * p.scale;
-    const h = p.h * p.scale;
-    if(w < 4 || h < 4) return; // skip tiny
-
+  proj.forEach(p=>{
+    const w=p.w*p.scale, h=p.h*p.scale;
+    if(w<8)return;
     ctx.save();
-    ctx.globalAlpha = CONFIG.opacity * p.depthFade;
-    ctx.translate(p.sx, p.sy);
-    ctx.rotate(p.rot);
-
-    if(p.isText) {
-      ctx.fillStyle = p.color;
-      ctx.font = `${Math.max(10, w * 0.4)}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(p.text, 0, 0);
-    } else if(p.img) {
-      ctx.drawImage(p.img, -w/2, -h/2, w, h);
-    }
+    ctx.globalAlpha=p.alpha;
+    ctx.translate(p.sx,p.sy);
+    ctx.rotate(p.tilt);
+    if(p.img) ctx.drawImage(p.img,-w/2,-h/2,w,h);
     ctx.restore();
   });
-
   requestAnimationFrame(loop);
 }
 </script>
-
-<!-- 
-  ════════════════════════════════════════════
-  ASSET LIST — edit this section!
-  Add all your PNG filenames below.
-  ════════════════════════════════════════════
--->
-<script>
-window.AR_ASSETS = [
-  'toronto.png',
-  'WO.png',
-  'BAI.png',
-  'beijing.png',
-  'blue-bubble.png',
-  'blue-strip.png',
-  'BU.png',
-  'bubbleCN1.png',
-  'bubbleEN1.png',
-  'bubbleFR1.png',
-  'chinese-strip.png',
-  'english-strip.png',
-  'face3.png',
-  'green-bubble.png',
-  'igotit.png',
-  'jsuis-perdu.png',
-  'MING.png',
-  'montreal.png',
-  'red-bubble.png',
-  'SOS3.png'
-  // add more filenames here as you upload them
-];
-</script>
-
 </body>
 </html>
