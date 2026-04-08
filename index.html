@@ -207,9 +207,14 @@ function resize() {
   if (!canvas) return;
   W = window.innerWidth;
   H = window.innerHeight;
-  canvas.width  = W;
-  canvas.height = H;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
   if (ctx) {
+    ctx.setTransform(1,0,0,1,0,0); // reset any previous scale
+    ctx.scale(dpr, dpr);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
   }
