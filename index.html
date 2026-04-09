@@ -9,32 +9,59 @@
 html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
 #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
 #three-canvas { position:fixed; inset:0; z-index:1; }
+
+
 #ui {
   position:fixed; inset:0; z-index:20;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  background:rgba(0,0,0,0.92); color:#fff; font-family:monospace;
-  text-align:center; padding:48px; gap:14px;
+  background:#f0ede8;
+  color:#111; font-family:monospace;
+  text-align:center; padding:48px; gap:10px;
 }
+
+
 #ui .sub { font-size:10px; color:#444; letter-spacing:0.22em; }
 #ui h1   { font-size:16px; font-weight:normal; }
 #ui p    { font-size:11px; color:#666; line-height:1.85; max-width:300px; }
 #ui button {
   margin-top:20px; padding:13px 44px; background: linear-gradient(135deg, #E8503A 0%, #4A9EBF 50%, #8BBF3A 100%);
   color:#fff; border:none; font-family:monospace;
-  font-size:11px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
+  font-size:14px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
 }
 </style>
 </head>
 <body>
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="three-canvas"></canvas>
+
 <div id="ui">
   
-  <h1>舌间 / Between Tongues / Entre les langues</h1>
-  <p>语言漂浮在我们之间。 / Language drifts between us. / Les langues dérivent entre nous.</p>
-  <div class="sub">滑动屏幕，探索不同角度 <br> Swipe to explore different angles  <br> Faites glisser pour explorer différents angles C'est qui?</div>
-  <button onclick="start()">Enter ↗</button>
+  <h1 style="font-size:32px; font-family:'Times New Roman', Times, serif;font-weight:500; letter-spacing:-0.01em; color:#111; line-height:1.3;">
+    Lost and Found Between One Word and the Next
+  </h1>
+
+  <div style="font-size:16px; font-style:italic; color:#888; margin-top:2px; line-height:1.5;">
+    Making Translanguaging Visible as Embodied Design Practice
+  </div>
+
+  <div style="width:32px; height:1px; background:#ccc; margin:16px auto;"></div>
+
+  <div style="font-size:14px; color:#555; line-height:1.9; max-width:300px;">
+    语言漂浮在我们之间。<br>
+    Language drifts between us.<br>
+    Les langues dérivent entre nous.
+  </div>
+
+  <div style="width:32px; height:1px; background:#ccc; margin:16px auto;"></div>
+
+  <div style="font-size:16px; letter-spacing:0.18em; text-transform:uppercase; color:#656565; margin-top:8px;">
+    Swipe to explore different angles
+  </div>
+
+  <button onclick="start()">Enter</button>
 </div>
+
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
