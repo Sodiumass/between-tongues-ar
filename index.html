@@ -1,368 +1,437 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Between Tongues</title>
-<style>
-* { margin:0; padding:0; box-sizing:border-box; }
-html, body {
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:#000;
-}
-#cam {
-  position:fixed;
-  inset:0;
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  z-index:0;
-}
-#c {
-  position:fixed;
-  inset:0;
-  width:100%;
-  height:100%;
-  z-index:1;
-  pointer-events:none;
-}
-#ui {
-  position:fixed;
-  inset:0;
-  z-index:20;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,0.92);
-  color:#fff;
-  font-family:monospace;
-  text-align:center;
-  padding:48px;
-  gap:14px;
-}
-#ui .sub {
-  font-size:10px;
-  color:#444;
-  letter-spacing:0.22em;
-}
-#ui h1 {
-  font-size:16px;
-  font-weight:normal;
-}
-#ui p {
-  font-size:11px;
-  color:#666;
-  line-height:1.85;
-  max-width:320px;
-}
-#ui button {
-  margin-top:20px;
-  padding:13px 44px;
-  background:#E8503A;
-  color:#fff;
-  border:none;
-  font-family:monospace;
-  font-size:11px;
-  letter-spacing:0.18em;
-  text-transform:uppercase;
-  cursor:pointer;
-}
-#dbg {
-  position:fixed;
-  left:8px;
-  bottom:8px;
-  z-index:30;
-  color:rgba(255,255,255,0.5);
-  font:10px/1.5 monospace;
-  background:rgba(0,0,0,0.28);
-  padding:6px 8px;
-  white-space:pre-line;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Between Tongues — Three.js</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #cam {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    #three-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    #ui {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.92);
+      color: #fff;
+      font-family: monospace;
+      text-align: center;
+      padding: 48px;
+      gap: 14px;
+    }
+
+    #ui .sub {
+      font-size: 10px;
+      color: #444;
+      letter-spacing: 0.22em;
+    }
+
+    #ui h1 {
+      font-size: 16px;
+      font-weight: normal;
+      letter-spacing: 0.04em;
+    }
+
+    #ui p {
+      font-size: 11px;
+      color: #666;
+      line-height: 1.85;
+      max-width: 340px;
+    }
+
+    #ui button {
+      margin-top: 20px;
+      padding: 13px 44px;
+      background: #E8503A;
+      color: #fff;
+      border: none;
+      font-family: monospace;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    #dbg {
+      position: fixed;
+      left: 8px;
+      bottom: 8px;
+      z-index: 30;
+      color: rgba(255,255,255,0.56);
+      font: 10px/1.5 monospace;
+      background: rgba(0,0,0,0.30);
+      padding: 6px 8px;
+      white-space: pre-line;
+      pointer-events: none;
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js"
+    }
+  }
+  </script>
 </head>
 <body>
+  <video id="cam" autoplay playsinline muted></video>
+  <div id="three-wrap"></div>
 
-<video id="cam" autoplay playsinline muted></video>
-<canvas id="c"></canvas>
+  <div id="ui">
+    <div class="sub">谁在说话 · Who's Speaking? · C'est qui?</div>
+    <h1>Between Tongues</h1>
+    <p>
+      Language drifts through the space.<br>
+      Feather-light, floating, turning.
+    </p>
+    <button id="enterBtn">Enter ↗</button>
+  </div>
 
-<div id="ui">
-  <div class="sub">谁在说话 · Who's Speaking? · C'est qui?</div>
-  <h1>Between Tongues</h1>
-  <p>Language drifts through the space.<br>Just watch.</p>
-  <button onclick="start()">Enter ↗</button>
-</div>
+  <div id="dbg">waiting…</div>
 
-<div id="dbg">waiting…</div>
+  <script type="module">
+    import * as THREE from 'three';
 
-<script>
-const ASSETS = [
-  'BAI.png','beijing.png','blue-bubble.png','BU.png',
-  'bubbleCN1.png','bubbleCN2.png','bubbleCN3.png','bubbleCN4.png',
-  'bubbleEN1.png','bubbleEN2.png','bubbleEN3.png','bubbleEN4.png','bubbleEN5.png',
-  'bubbleFR1.png','bubbleFR2.png','bubbleFR3.png','bubbleFR4.png',
-  'emoji.png','etalors.png','face3.png','green-bubble.png','igotit.png',
-  'ithink.png','jsuis-perdu.png','LUANMA.png','maaybe.png','MING.png',
-  'mini1.png','mini2.png','mini3.png','mini4.png','mini5.png','mini6.png',
-  'mini7.png','mini8.png','mini9.png','mini10.png','mini11.png','mini12.png',
-  'mini13.png','mini14.png','mini15.png','mini16.png','mini17.png',
-  'montreal.png',
-  'noise1.png','noise2.png','noise3.png','noise4.png','noise5.png','noise6.png',
-  'noise7.png','noise8.png','noise9.png','noise10.png','noise11.png','noise12.png',
-  'red-bubble.png','SOS3.png','toronto.png',
-  'wiggleEN1.png','wiggleEN2.png','wiggleEN3.png','wiggleFR1.png','wiggleFR2.png',
-  'WO.png','YANWENZI.png'
-];
+    const ASSETS = [
+      'BAI.png','beijing.png','blue-bubble.png','BU.png',
+      'bubbleCN1.png','bubbleCN2.png','bubbleCN3.png','bubbleCN4.png',
+      'bubbleEN1.png','bubbleEN2.png','bubbleEN3.png','bubbleEN4.png','bubbleEN5.png',
+      'bubbleFR1.png','bubbleFR2.png','bubbleFR3.png','bubbleFR4.png',
+      'emoji.png','etalors.png','face3.png','green-bubble.png','igotit.png',
+      'ithink.png','jsuis-perdu.png','LUANMA.png','maaybe.png','MING.png',
+      'mini1.png','mini2.png','mini3.png','mini4.png','mini5.png','mini6.png',
+      'mini7.png','mini8.png','mini9.png','mini10.png','mini11.png','mini12.png',
+      'mini13.png','mini14.png','mini15.png','mini16.png','mini17.png',
+      'montreal.png',
+      'noise1.png','noise2.png','noise3.png','noise4.png','noise5.png','noise6.png',
+      'noise7.png','noise8.png','noise9.png','noise10.png','noise11.png','noise12.png',
+      'red-bubble.png','SOS3.png','toronto.png',
+      'wiggleEN1.png','wiggleEN2.png','wiggleEN3.png','wiggleFR1.png','wiggleFR2.png',
+      'WO.png','YANWENZI.png'
+    ];
 
-// 统一缩小
-const REF_SCALE = 0.00018;
-const MAX_DPR = 1.35;
+    const IMAGE_SCALE = {
+      'BAI.png': 0.90,
+      'beijing.png': 1.04,
+      'blue-bubble.png': 0.96,
+      'BU.png': 0.86,
 
-// 透视
-const CAMERA_Z = 1100;
-const WORLD_MIN_Z = 300;
-const WORLD_MAX_Z = 1600;
+      'bubbleCN1.png': 0.84, 'bubbleCN2.png': 0.84, 'bubbleCN3.png': 0.84, 'bubbleCN4.png': 0.84,
+      'bubbleEN1.png': 0.84, 'bubbleEN2.png': 0.84, 'bubbleEN3.png': 0.84, 'bubbleEN4.png': 0.84, 'bubbleEN5.png': 0.84,
+      'bubbleFR1.png': 0.84, 'bubbleFR2.png': 0.84, 'bubbleFR3.png': 0.84, 'bubbleFR4.png': 0.84,
 
-// 漂浮
-const FLOAT_HZ = 0.09;
-const FLOAT_X = 26;
-const FLOAT_Y = 18;
-const FLOAT_Z = 90;
+      'emoji.png': 0.88,
+      'etalors.png': 0.90,
+      'face3.png': 0.98,
+      'green-bubble.png': 0.96,
+      'igotit.png': 0.86,
+      'ithink.png': 0.88,
+      'jsuis-perdu.png': 0.88,
+      'LUANMA.png': 0.96,
+      'maaybe.png': 0.88,
+      'MING.png': 0.88,
 
-// 角度变化
-const ROT_HZ = 0.07;
-const YAW_AMT   = 0.65;   // 左右转
-const PITCH_AMT = 0.38;   // 前后仰
-const ROLL_AMT  = 0.22;   // 平面滚转
+      'mini1.png': 0.56, 'mini2.png': 0.56, 'mini3.png': 0.56, 'mini4.png': 0.56, 'mini5.png': 0.56,
+      'mini6.png': 0.56, 'mini7.png': 0.56, 'mini8.png': 0.56, 'mini9.png': 0.56, 'mini10.png': 0.56,
+      'mini11.png': 0.56, 'mini12.png': 0.56, 'mini13.png': 0.56, 'mini14.png': 0.56, 'mini15.png': 0.56,
+      'mini16.png': 0.56, 'mini17.png': 0.56,
 
-const IMAGE_SCALE = {
-  'BAI.png': 0.90,
-  'beijing.png': 1.10,
-  'blue-bubble.png': 1.00,
-  'BU.png': 0.88,
+      'montreal.png': 1.00,
 
-  'bubbleCN1.png': 0.88,'bubbleCN2.png': 0.88,'bubbleCN3.png': 0.88,'bubbleCN4.png': 0.88,
-  'bubbleEN1.png': 0.88,'bubbleEN2.png': 0.88,'bubbleEN3.png': 0.88,'bubbleEN4.png': 0.88,'bubbleEN5.png': 0.88,
-  'bubbleFR1.png': 0.88,'bubbleFR2.png': 0.88,'bubbleFR3.png': 0.88,'bubbleFR4.png': 0.88,
+      'noise1.png': 0.60, 'noise2.png': 0.60, 'noise3.png': 0.60, 'noise4.png': 0.60,
+      'noise5.png': 0.60, 'noise6.png': 0.60, 'noise7.png': 0.60, 'noise8.png': 0.60,
+      'noise9.png': 0.60, 'noise10.png': 0.60, 'noise11.png': 0.60, 'noise12.png': 0.60,
 
-  'emoji.png': 0.92,
-  'etalors.png': 0.95,
-  'face3.png': 1.08,
-  'green-bubble.png': 1.00,
-  'igotit.png': 0.90,
-  'ithink.png': 0.92,
-  'jsuis-perdu.png': 0.92,
-  'LUANMA.png': 1.00,
-  'maaybe.png': 0.92,
-  'MING.png': 0.92,
+      'red-bubble.png': 0.96,
+      'SOS3.png': 0.88,
+      'toronto.png': 1.00,
 
-  'mini1.png': 0.58,'mini2.png': 0.58,'mini3.png': 0.58,'mini4.png': 0.58,'mini5.png': 0.58,
-  'mini6.png': 0.58,'mini7.png': 0.58,'mini8.png': 0.58,'mini9.png': 0.58,'mini10.png': 0.58,
-  'mini11.png': 0.58,'mini12.png': 0.58,'mini13.png': 0.58,'mini14.png': 0.58,'mini15.png': 0.58,
-  'mini16.png': 0.58,'mini17.png': 0.58,
+      'wiggleEN1.png': 0.74, 'wiggleEN2.png': 0.74, 'wiggleEN3.png': 0.74,
+      'wiggleFR1.png': 0.74, 'wiggleFR2.png': 0.74,
 
-  'montreal.png': 1.05,
+      'WO.png': 0.88,
+      'YANWENZI.png': 0.96
+    };
 
-  'noise1.png': 0.68,'noise2.png': 0.68,'noise3.png': 0.68,'noise4.png': 0.68,
-  'noise5.png': 0.68,'noise6.png': 0.68,'noise7.png': 0.68,'noise8.png': 0.68,
-  'noise9.png': 0.68,'noise10.png': 0.68,'noise11.png': 0.68,'noise12.png': 0.68,
+    const CONFIG = {
+      maxDpr: 1.5,
+      fov: 42,
+      near: 0.1,
+      far: 60,
+      cameraZ: 10,
 
-  'red-bubble.png': 1.00,
-  'SOS3.png': 0.92,
-  'toronto.png': 1.08,
+      // 空间范围
+      spreadX: 11,
+      spreadY: 6.5,
+      spreadZNear: -2,
+      spreadZFar: -16,
 
-  'wiggleEN1.png': 0.80,'wiggleEN2.png': 0.80,'wiggleEN3.png': 0.80,
-  'wiggleFR1.png': 0.80,'wiggleFR2.png': 0.80,
+      // 羽毛感运动
+      driftHz: 0.23,
+      driftX: 0.18,
+      driftY: 0.14,
+      driftZ: 0.22,
 
-  'WO.png': 0.92,
-  'YANWENZI.png': 1.00
-};
+      flutterHz: 0.75,
+      flutterY: 0.05,
+      flutterRoll: 0.10,
 
-let canvas, ctx, W, H, dpr;
-let imgs = [];
-let cards = [];
-let T = 0;
-let lastTS = 0;
+      rotHz: 0.20,
+      yawAmt: 0.65,
+      pitchAmt: 0.40,
+      rollAmt: 0.35,
 
-async function start() {
-  document.getElementById('ui').style.display = 'none';
+      globalScale: 0.0052
+    };
 
-  canvas = document.getElementById('c');
-  ctx = canvas.getContext('2d');
+    const dbg = document.getElementById('dbg');
+    const wrap = document.getElementById('three-wrap');
+    const video = document.getElementById('cam');
+    const enterBtn = document.getElementById('enterBtn');
 
-  resize();
-  window.addEventListener('resize', () => {
-    resize();
-    buildScene();
-  });
+    let renderer, scene, camera, clock;
+    let cards = [];
+    let started = false;
 
-  try {
-    const s = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
-      audio: false
-    });
-    document.getElementById('cam').srcObject = s;
-  } catch (e) {}
+    function setDbg(text) {
+      dbg.textContent = text;
+    }
 
-  imgs = (await Promise.all(
-    ASSETS.map(name => new Promise(res => {
-      const img = new Image();
-      img.onload = () => {
-        img._srcName = name;
-        res(img);
-      };
-      img.onerror = () => {
-        console.warn('Failed to load:', name);
-        res(null);
-      };
-      img.src = './assets/' + name;
-    }))
-  )).filter(Boolean);
+    async function start() {
+      if (started) return;
+      started = true;
 
-  document.getElementById('dbg').textContent =
-    `assets listed: ${ASSETS.length}\nloaded: ${imgs.length}`;
+      document.getElementById('ui').style.display = 'none';
 
-  buildScene();
-  requestAnimationFrame(loop);
-}
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        console.warn(err);
+      }
 
-function buildScene() {
-  cards = [];
-  if (!imgs.length) return;
+      initThree();
+      await buildScene();
+      animate();
+    }
 
-  imgs.forEach(img => {
-    const imgScale = IMAGE_SCALE[img._srcName] ?? 1;
+    function initThree() {
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance'
+      });
 
-    const baseW = img.naturalWidth * REF_SCALE * W * imgScale;
-    const baseH = img.naturalHeight * REF_SCALE * W * imgScale;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.maxDpr));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.setClearColor(0x000000, 0);
 
-    // 空间分布
-    const x = (Math.random() * 1.3 - 0.65) * W;
-    const y = (Math.random() * 0.9 - 0.45) * H;
-    const z = WORLD_MIN_Z + Math.random() * (WORLD_MAX_Z - WORLD_MIN_Z);
+      wrap.innerHTML = '';
+      wrap.appendChild(renderer.domElement);
 
-    cards.push({
-      img,
-      baseW,
-      baseH,
+      scene = new THREE.Scene();
 
-      x, y, z,
+      camera = new THREE.PerspectiveCamera(
+        CONFIG.fov,
+        window.innerWidth / window.innerHeight,
+        CONFIG.near,
+        CONFIG.far
+      );
+      camera.position.z = CONFIG.cameraZ;
 
-      opacityBase: 0.35 + Math.random() * 0.55,
+      clock = new THREE.Clock();
 
-      floatPhaseX: Math.random() * Math.PI * 2,
-      floatPhaseY: Math.random() * Math.PI * 2,
-      floatPhaseZ: Math.random() * Math.PI * 2,
-      floatRateX: 0.7 + Math.random() * 0.6,
-      floatRateY: 0.7 + Math.random() * 0.6,
-      floatRateZ: 0.7 + Math.random() * 0.6,
+      window.addEventListener('resize', onResize);
+    }
 
-      yawPhase: Math.random() * Math.PI * 2,
-      pitchPhase: Math.random() * Math.PI * 2,
-      rollPhase: Math.random() * Math.PI * 2,
+    async function buildScene() {
+      const loader = new THREE.TextureLoader();
+      const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
-      yawRate: 0.7 + Math.random() * 0.5,
-      pitchRate: 0.7 + Math.random() * 0.5,
-      rollRate: 0.7 + Math.random() * 0.5
-    });
-  });
-}
+      const textures = await Promise.all(
+        ASSETS.map(name => loadTexture(loader, `./assets/${name}`, name, maxAniso))
+      );
 
-function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight;
-  dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      const loaded = textures.filter(Boolean);
+      setDbg(`assets listed: ${ASSETS.length}\nloaded: ${loaded.length}\nmax anisotropy: ${maxAniso}`);
 
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width = W + 'px';
-  canvas.style.height = H + 'px';
+      for (const tex of loaded) {
+        const name = tex.userData.srcName;
+        const imgScale = IMAGE_SCALE[name] ?? 1;
 
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.scale(dpr, dpr);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'medium';
-}
+        const img = tex.image;
+        const aspect = img.width / img.height;
 
-function loop(ts) {
-  const dt = Math.min((ts - lastTS) / 1000, 0.05);
-  lastTS = ts;
-  T += dt;
+        const planeH = img.height * CONFIG.globalScale * imgScale;
+        const planeW = planeH * aspect;
 
-  ctx.clearRect(0, 0, W, H);
+        const geo = new THREE.PlaneGeometry(planeW, planeH, 1, 1);
 
-  const cx = W / 2;
-  const cy = H / 2;
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
 
-  const visible = [];
+        const mesh = new THREE.Mesh(geo, mat);
 
-  for (const c of cards) {
-    // 3D 漂浮
-    const px = c.x + Math.sin(T * FLOAT_HZ * c.floatRateX * Math.PI * 2 + c.floatPhaseX) * FLOAT_X;
-    const py = c.y + Math.cos(T * FLOAT_HZ * c.floatRateY * Math.PI * 2 + c.floatPhaseY) * FLOAT_Y;
-    const pz = c.z + Math.sin(T * FLOAT_HZ * c.floatRateZ * Math.PI * 2 + c.floatPhaseZ) * FLOAT_Z;
+        mesh.position.set(
+          THREE.MathUtils.randFloatSpread(CONFIG.spreadX),
+          THREE.MathUtils.randFloatSpread(CONFIG.spreadY),
+          THREE.MathUtils.randFloat(CONFIG.spreadZFar, CONFIG.spreadZNear)
+        );
 
-    // 自由转动
-    const yaw   = Math.sin(T * ROT_HZ * c.yawRate   * Math.PI * 2 + c.yawPhase)   * YAW_AMT;
-    const pitch = Math.sin(T * ROT_HZ * c.pitchRate * Math.PI * 2 + c.pitchPhase) * PITCH_AMT;
-    const roll  = Math.sin(T * ROT_HZ * c.rollRate  * Math.PI * 2 + c.rollPhase)  * ROLL_AMT;
+        mesh.rotation.set(
+          THREE.MathUtils.randFloatSpread(0.8),
+          THREE.MathUtils.randFloatSpread(1.2),
+          THREE.MathUtils.randFloatSpread(0.8)
+        );
 
-    const perspective = CAMERA_Z / (CAMERA_Z + pz);
-    const sx = cx + px * perspective;
-    const sy = cy + py * perspective;
+        const baseOpacity = THREE.MathUtils.randFloat(0.42, 0.95);
+        mat.opacity = baseOpacity;
 
-    // 关键：模拟卡片不是正面朝向你
-    const faceX = Math.max(0.20, Math.cos(yaw));
-    const faceY = Math.max(0.25, Math.cos(pitch));
+        scene.add(mesh);
 
-    const drawW = c.baseW * perspective * faceX;
-    const drawH = c.baseH * perspective * faceY;
+        cards.push({
+          mesh,
+          material: mat,
+          baseOpacity,
 
-    if (drawW < 2 || drawH < 2) continue;
-    if (sx + drawW/2 < -120 || sx - drawW/2 > W + 120) continue;
-    if (sy + drawH/2 < -120 || sy - drawH/2 > H + 120) continue;
+          basePos: mesh.position.clone(),
+          baseRot: mesh.rotation.clone(),
 
-    const alphaDepth = 1 - (pz - WORLD_MIN_Z) / (WORLD_MAX_Z - WORLD_MIN_Z);
-    const alpha = clamp(c.opacityBase * (0.45 + alphaDepth * 0.75), 0.08, 1);
+          driftPhaseX: Math.random() * Math.PI * 2,
+          driftPhaseY: Math.random() * Math.PI * 2,
+          driftPhaseZ: Math.random() * Math.PI * 2,
 
-    visible.push({
-      img: c.img,
-      sx, sy, pz,
-      drawW, drawH,
-      roll,
-      yaw,
-      pitch,
-      alpha
-    });
-  }
+          rotPhaseX: Math.random() * Math.PI * 2,
+          rotPhaseY: Math.random() * Math.PI * 2,
+          rotPhaseZ: Math.random() * Math.PI * 2,
 
-  visible.sort((a, b) => b.pz - a.pz);
+          flutterPhase: Math.random() * Math.PI * 2,
 
-  for (const v of visible) {
-    ctx.save();
-    ctx.globalAlpha = v.alpha;
-    ctx.translate(v.sx, v.sy);
+          driftRateX: 0.7 + Math.random() * 0.7,
+          driftRateY: 0.7 + Math.random() * 0.7,
+          driftRateZ: 0.7 + Math.random() * 0.7,
 
-    // 先 roll
-    ctx.rotate(v.roll);
+          rotRateX: 0.7 + Math.random() * 0.6,
+          rotRateY: 0.7 + Math.random() * 0.6,
+          rotRateZ: 0.7 + Math.random() * 0.6,
 
-    // 再加一点 shear 感，增强伪3D
-    const shearX = Math.sin(v.yaw) * 0.18;
-    const shearY = Math.sin(v.pitch) * 0.10;
-    ctx.transform(1, shearY, shearX, 1, 0, 0);
+          flutterRate: 0.9 + Math.random() * 1.0
+        });
+      }
+    }
 
-    ctx.drawImage(v.img, -v.drawW / 2, -v.drawH / 2, v.drawW, v.drawH);
-    ctx.restore();
-  }
+    function loadTexture(loader, url, name, maxAniso) {
+      return new Promise(resolve => {
+        loader.load(
+          url,
+          (tex) => {
+            tex.userData.srcName = name;
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.anisotropy = Math.min(maxAniso, 8);
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.generateMipmaps = true;
+            resolve(tex);
+          },
+          undefined,
+          () => {
+            console.warn('Failed to load', url);
+            resolve(null);
+          }
+        );
+      });
+    }
 
-  requestAnimationFrame(loop);
-}
+    function onResize() {
+      if (!renderer || !camera) return;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.maxDpr));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
 
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
-}
-</script>
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const t = clock.getElapsedTime();
+
+      for (const c of cards) {
+        const m = c.mesh;
+
+        // feather-like drift
+        const dx = Math.sin(t * CONFIG.driftHz * c.driftRateX + c.driftPhaseX) * CONFIG.driftX;
+        const dy = Math.cos(t * CONFIG.driftHz * c.driftRateY + c.driftPhaseY) * CONFIG.driftY;
+        const dz = Math.sin(t * CONFIG.driftHz * c.driftRateZ + c.driftPhaseZ) * CONFIG.driftZ;
+
+        // light flutter
+        const flutterY = Math.sin(t * CONFIG.flutterHz * c.flutterRate + c.flutterPhase) * CONFIG.flutterY;
+        const flutterRoll = Math.sin(t * CONFIG.flutterHz * c.flutterRate + c.flutterPhase) * CONFIG.flutterRoll;
+
+        m.position.x = c.basePos.x + dx;
+        m.position.y = c.basePos.y + dy + flutterY;
+        m.position.z = c.basePos.z + dz;
+
+        // free rotation in space
+        m.rotation.x =
+          c.baseRot.x +
+          Math.sin(t * CONFIG.rotHz * c.rotRateX + c.rotPhaseX) * CONFIG.pitchAmt;
+
+        m.rotation.y =
+          c.baseRot.y +
+          Math.sin(t * CONFIG.rotHz * c.rotRateY + c.rotPhaseY) * CONFIG.yawAmt;
+
+        m.rotation.z =
+          c.baseRot.z +
+          Math.sin(t * CONFIG.rotHz * c.rotRateZ + c.rotPhaseZ) * CONFIG.rollAmt +
+          flutterRoll;
+
+        // depth fade
+        const zNorm = THREE.MathUtils.clamp(
+          (m.position.z - CONFIG.spreadZFar) / (CONFIG.spreadZNear - CONFIG.spreadZFar),
+          0,
+          1
+        );
+        c.material.opacity = THREE.MathUtils.lerp(0.18, c.baseOpacity, zNorm);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    enterBtn.addEventListener('click', start);
+  </script>
 </body>
 </html>
