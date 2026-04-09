@@ -1,379 +1,291 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Between Tongues</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  html, body { width:100%; height:100%; overflow:hidden; background:#000; }
-  #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
-  #c { position:fixed; inset:0; width:100%; height:100%; z-index:1; touch-action:none; }
-  #ui {
-    position:fixed; inset:0; z-index:20;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:rgba(0,0,0,0.92); color:#fff; font-family:monospace;
-    text-align:center; padding:40px; gap:12px;
-  }
-  #ui h1 { font-size:16px; font-weight:normal; letter-spacing:0.05em; }
-  #ui p { font-size:11px; color:#777; line-height:1.8; max-width:340px; }
-  #ui button {
-    margin-top:20px; padding:13px 40px; background:#E8503A;
-    color:#fff; border:none; font-family:monospace;
-    font-size:11px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
-  }
-  #dbg {
-    position:fixed; top:8px; left:8px; z-index:30;
-    font-family:monospace; font-size:10px; color:yellow;
-    line-height:1.45; white-space:pre-line;
-    background:rgba(0,0,0,0.45); padding:6px 8px; pointer-events:none;
-  }
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:100%; height:100%; overflow:hidden; background:#000; }
+#cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
+#c   { position:fixed; inset:0; width:100%; height:100%; z-index:1; touch-action:none; }
+#ui, #permscreen {
+  position:fixed; inset:0; z-index:20;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.93); color:#fff; font-family:monospace;
+  text-align:center; padding:40px; gap:14px;
+}
+#ui h1, #permscreen h1 { font-size:16px; font-weight:normal; }
+#ui p, #permscreen p { font-size:11px; color:#666; line-height:1.8; max-width:320px; }
+.btn {
+  margin-top:16px; padding:13px 40px; background:#E8503A;
+  color:#fff; border:none; font-family:monospace;
+  font-size:11px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
+}
+#dbg {
+  position:fixed; top:8px; left:8px; z-index:30;
+  font-family:monospace; font-size:10px; color:yellow;
+  line-height:1.5; background:rgba(0,0,0,0.5); padding:5px 8px;
+  pointer-events:none; white-space:pre;
+}
+#permscreen { display:none; }
 </style>
 </head>
 <body>
-
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="c"></canvas>
 
+<!-- SCREEN 1: entry -->
 <div id="ui">
   <div style="font-size:10px;color:#444;letter-spacing:0.2em">谁在说话 · Who's Speaking? · C'est qui?</div>
   <h1>Between Tongues</h1>
-  <p>
-    Turn your body to look around.<br>
-    (Ensure you are using HTTPS for gyro to work)
-  </p>
-  <button onclick="begin()">Enter ↗</button>
+  <p>Hold your phone up.<br>Turn your body slowly.<br>Language floats all around you.</p>
+  <button class="btn" onclick="goToPerm()">Enter ↗</button>
 </div>
 
-<div id="dbg">waiting…</div>
+<!-- SCREEN 2: explicit gyro permission (iOS needs a fresh tap) -->
+<div id="permscreen">
+  <h1>Allow Motion Access</h1>
+  <p>This experience uses your phone's gyroscope to let you look around the space.<br><br>Tap below to allow motion access.</p>
+  <button class="btn" id="permbtn" onclick="grantAndStart()">Allow & Start</button>
+</div>
+
+<div id="dbg">loading…</div>
 
 <script>
-// ─────────────────────────────────────────
-// ASSETS (省略了长长的列表，请将你之前的 67 个 ASSETS 放回这里)
-// ─────────────────────────────────────────
+// ── FULL ASSET LIST ──────────────────────────────────────
 const ASSETS = [
-  'BAI.png', 'beijing.png', 'blue-bubble.png', 'BU.png',
-  // ... (保留你原有的完整数组)
-  'WO.png', 'YANWENZI.png'
+  'toronto.png','WO.png','BAI.png','beijing.png',
+  'blue-bubble.png','blue-strip.png','BU.png',
+  'bubbleCN1.png','bubbleEN1.png','bubbleFR1.png',
+  'chinese-strip.png','english-strip.png','face3.png',
+  'green-bubble.png','igotit.png','jsuis-perdu.png',
+  'MING.png','montreal.png','red-bubble.png','SOS3.png'
 ];
 
-// IMAGE_SCALE 作为微调保留。既然图是从同画布导出，大部分都可以是 1.0
-// 只有当你觉得某张图在 3D 里显得过于突兀时，再来这里单独调整
-const IMAGE_SCALE = {
-  // 'beijing.png': 1.20,
-};
+// ── CONFIG ───────────────────────────────────────────────
+const HFOV        = 65;
+const N           = 50;
+const MIN_DIST    = 500;
+const MAX_DIST    = 1400;
+const GLOBAL_SCALE= 0.45;   // overall image size
+const BOB_HZ      = 0.22;   // bobs per second
+const BOB_PX      = 22;     // float amplitude
+const DRIFT_PX    = 18;     // gentle side drift
 
-// ─────────────────────────────────────────
-// SETTINGS
-// ─────────────────────────────────────────
-const HFOV = 62;
-
-// ✨ 动画设置：加快频率，加大浮动，增加游走感
-const BOB_HZ = 0.35;    // 速度 (原为 0.14)
-const BOB_PX = 25;      // 上下浮动幅度 (原为 8)
-const DRIFT_PX = 30;    // 水平/深度游走幅度
-
-// ✨ 核心修复：全局像素缩放比例
-// 通过调整这个值，控制所有图片的整体大小，完美保留原图的相互比例
-const GLOBAL_SCALE = 0.55; 
-
-const MIN_DIST = 600;          
-const MAX_DIST = 1600;
-const FRONT_BIAS = 0.82;       
-
-// ─────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────
+// ── STATE ────────────────────────────────────────────────
 let canvas, ctx, W, H;
-let imgs = [];
-let particles = [];
-
-let camYaw = 0;
-let camPitch = 0;
-
-let orientationOK = false;
-let gotGyroData = false;
+let imgs = [], particles = [];
+let camYaw = 0, camPitch = 0;
 let headingRef = null;
+let gyroLive = false;
+let isDrag = false, dragX = 0, dragY = 0;
+let lastTS = 0, totalTime = 0;
 
-let lastTS = 0;
-let totalTime = 0;
-
-let isDragging = false;
-let dragLastX = 0;
-let dragLastY = 0;
-
-// ─────────────────────────────────────────
-// BEGIN
-// ─────────────────────────────────────────
-async function begin() {
+// ── SCREEN FLOW ──────────────────────────────────────────
+function goToPerm() {
   document.getElementById('ui').style.display = 'none';
+  document.getElementById('permscreen').style.display = 'flex';
+}
 
+async function grantAndStart() {
+  document.getElementById('permscreen').style.display = 'none';
+  dbg('Starting…');
+
+  // canvas
   canvas = document.getElementById('c');
   ctx = canvas.getContext('2d');
-  
   resize();
   window.addEventListener('resize', resize);
-  enableFallbackDrag();
 
+  // drag fallback
+  canvas.addEventListener('pointerdown', e => { isDrag=true; dragX=e.clientX; dragY=e.clientY; });
+  window.addEventListener('pointerup',   () => isDrag=false);
+  window.addEventListener('pointermove', e => {
+    if (!isDrag || gyroLive) return;
+    camYaw   += (e.clientX - dragX) * 0.004;
+    camPitch += (e.clientY - dragY) * 0.002;
+    camPitch  = clamp(camPitch, -0.3, 0.3);
+    dragX = e.clientX; dragY = e.clientY;
+    dbg(`Drag mode\nYaw: ${deg(camYaw)}°`);
+  });
+
+  // camera
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
-      audio: false
+    const s = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode:{ideal:'environment'} }, audio:false
     });
-    document.getElementById('cam').srcObject = stream;
-  } catch (e) {}
+    document.getElementById('cam').srcObject = s;
+  } catch(e) { dbg('Camera denied (ok, continuing)'); }
 
-  await startOrientation();
+  // ── GYRO ── called right here inside the tap handler
+  await setupGyro();
 
-  // Load images
-  const loaded = await Promise.all(ASSETS.map(name => loadImg('./assets/' + name)));
+  // load images
+  dbg('Loading images…');
+  const loaded = await Promise.all(ASSETS.map(n => loadImg('./assets/'+n)));
   imgs = loaded.filter(Boolean);
+  dbg(`Loaded ${imgs.length} images`);
 
   scatter();
   requestAnimationFrame(frame);
 }
 
-function loadImg(src) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => { img._srcName = src.split('/').pop(); resolve(img); };
-    img.onerror = () => { console.warn('Failed to load:', src); resolve(null); };
-    img.src = src;
-  });
-}
-
-// ─────────────────────────────────────────
-// ORIENTATION / GYRO
-// ─────────────────────────────────────────
-async function startOrientation() {
-  const dbg = document.getElementById('dbg');
-
+// ── GYRO SETUP ───────────────────────────────────────────
+async function setupGyro() {
   if (!window.DeviceOrientationEvent) {
-    dbg.textContent = 'DeviceOrientationEvent not supported';
-    return;
+    dbg('No DeviceOrientationEvent'); return;
   }
 
-  // 检测是否是 HTTP 环境 (非 HTTPS 会导致请求被直接拒绝)
-  if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
-    dbg.textContent = 'ERROR: Gyro requires HTTPS.\nPlease use Ngrok or deploy to Vercel/GitHub Pages.';
-    return;
+  // iOS 13+ permission — this MUST be called synchronously inside a tap
+  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const res = await DeviceOrientationEvent.requestPermission();
+      if (res !== 'granted') { dbg('Motion permission denied'); return; }
+      dbg('iOS permission granted ✓');
+    } catch(e) { dbg('Permission error: '+e); return; }
   }
 
-  try {
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      const result = await DeviceOrientationEvent.requestPermission();
-      if (result !== 'granted') {
-        dbg.textContent = 'Motion permission denied';
-        return;
-      }
-    }
-    window.addEventListener('deviceorientation', onOrientation, true);
-    orientationOK = true;
-    dbg.textContent = 'Orientation active. Waiting for data...';
-  } catch (err) {
-    dbg.textContent = 'Motion setup failed (Usually HTTPS issue)';
-  }
+  window.addEventListener('deviceorientation', e => {
+    // prefer webkitCompassHeading (absolute north-relative, iOS)
+    // fall back to alpha (may drift)
+    let heading;
+    if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+      heading = e.webkitCompassHeading;
+    } else if (typeof e.alpha === 'number' && !isNaN(e.alpha)) {
+      heading = (360 - e.alpha) % 360;
+    } else return;
+
+    if (headingRef === null) headingRef = heading;
+
+    let d = heading - headingRef;
+    if (d >  180) d -= 360;
+    if (d < -180) d += 360;
+
+    camYaw   = d * Math.PI / 180;
+    camPitch = clamp(((e.beta||90) - 90) * Math.PI/180 * 0.15, -0.3, 0.3);
+
+    if (!gyroLive) { gyroLive = true; }
+    dbg(`Gyro LIVE ✓\nYaw: ${deg(camYaw)}°\nHeading: ${heading.toFixed(1)}°`);
+  }, true);
 }
 
-function onOrientation(e) {
-  const dbg = document.getElementById('dbg');
-  let heading = null;
-
-  if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
-    heading = e.webkitCompassHeading; 
-  } else if (typeof e.alpha === 'number' && !Number.isNaN(e.alpha)) {
-    heading = 360 - e.alpha;
-  }
-
-  const beta = (typeof e.beta === 'number' && !Number.isNaN(e.beta)) ? e.beta : 90;
-  if (heading == null) return;
-
-  gotGyroData = true;
-
-  if (headingRef === null) headingRef = heading;
-
-  let d = heading - headingRef;
-  if (d > 180) d -= 360;
-  if (d < -180) d += 360;
-
-  camYaw = d * Math.PI / 180;
-  camPitch = (beta - 90) * Math.PI / 180 * 0.12;
-  camPitch = clamp(camPitch, -0.30, 0.30);
-
-  dbg.textContent = `Gyro: Active\nYaw: ${(camYaw * 180 / Math.PI).toFixed(1)}°\nSwipe: Disabled (Sensor takes over)`;
-}
-
-// ─────────────────────────────────────────
-// FALLBACK DRAG
-// ─────────────────────────────────────────
-function enableFallbackDrag() {
-  const el = document.getElementById('c');
-  el.addEventListener('pointerdown', (e) => { isDragging = true; dragLastX = e.clientX; dragLastY = e.clientY; });
-  window.addEventListener('pointerup', () => { isDragging = false; });
-  window.addEventListener('pointercancel', () => { isDragging = false; });
-  window.addEventListener('pointermove', (e) => {
-    if (!isDragging || gotGyroData) return; 
-    const dx = e.clientX - dragLastX;
-    const dy = e.clientY - dragLastY;
-    dragLastX = e.clientX; dragLastY = e.clientY;
-
-    camYaw += dx * 0.0045;
-    camPitch += dy * 0.0022;
-    camPitch = clamp(camPitch, -0.30, 0.30);
-    
-    document.getElementById('dbg').textContent = `Gyro: Off (Swipe Active)\nYaw: ${(camYaw * 180 / Math.PI).toFixed(1)}°`;
-  });
-}
-
-// ─────────────────────────────────────────
-// SCATTER
-// ─────────────────────────────────────────
+// ── SCATTER ──────────────────────────────────────────────
 function scatter() {
   particles = [];
-  if (!imgs.length) return;
-
-  const chosen = shuffle(imgs);
-
-  for (let i = 0; i < chosen.length; i++) {
-    const img = chosen[i];
-
-    let theta;
-    if (Math.random() < FRONT_BIAS) {
-      theta = (Math.random() - 0.5) * Math.PI * 0.95; 
-    } else {
-      theta = (Math.random() - 0.5) * Math.PI * 1.8;  
-    }
-
-    const phi = (Math.random() - 0.5) * Math.PI * 0.34;
-    const dist = MIN_DIST + Math.random() * (MAX_DIST - MIN_DIST);
+  for (let i = 0; i < N; i++) {
+    const theta = (Math.random() - 0.5) * Math.PI * 1.9; // 342° spread
+    const phi   = (Math.random() - 0.5) * Math.PI * 0.55;
+    const dist  = MIN_DIST + Math.random() * (MAX_DIST - MIN_DIST);
 
     const wx = dist * Math.cos(phi) * Math.sin(theta);
     const wy = dist * Math.sin(phi);
     const wz = dist * Math.cos(phi) * Math.cos(theta);
 
-    const imgScale = IMAGE_SCALE[img._srcName] ?? 1;
-    
-    // ✨ 核心修复：直接使用图片的自然像素乘以全局缩放比
-    const iw = img.naturalWidth * GLOBAL_SCALE * imgScale;
-    const ih = img.naturalHeight * GLOBAL_SCALE * imgScale;
+    const img = imgs[i % imgs.length];
+    const iw  = img.naturalWidth  * GLOBAL_SCALE;
+    const ih  = img.naturalHeight * GLOBAL_SCALE;
 
     particles.push({
       img, iw, ih, wx, wy, wz,
-      bobPhase: Math.random() * Math.PI * 2,
-      bobRate: 0.8 + Math.random() * 0.5,
-      tilt: (Math.random() - 0.5) * 0.14,
-      // ✨ 赋予粒子独立游走属性
-      driftX: (Math.random() - 0.5) * DRIFT_PX,
-      driftZ: (Math.random() - 0.5) * DRIFT_PX,
-      driftRate: 0.3 + Math.random() * 0.7
+      bobPhase : Math.random() * Math.PI * 2,
+      bobRate  : 0.7 + Math.random() * 0.6,
+      driftX   : (Math.random()-0.5) * DRIFT_PX,
+      driftZ   : (Math.random()-0.5) * DRIFT_PX,
+      driftRate: 0.3 + Math.random() * 0.5,
+      tilt     : (Math.random()-0.5) * 0.18,
     });
   }
 }
 
-function shuffle(arr) {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-// ─────────────────────────────────────────
-// RESIZE
-// ─────────────────────────────────────────
+// ── RESIZE ───────────────────────────────────────────────
 function resize() {
   if (!canvas) return;
-  W = window.innerWidth;
-  H = window.innerHeight;
+  W = window.innerWidth; H = window.innerHeight;
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width  = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
   if (ctx) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.scale(dpr, dpr);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
   }
 }
 
-// ─────────────────────────────────────────
-// FRAME
-// ─────────────────────────────────────────
+// ── RENDER ───────────────────────────────────────────────
 function frame(ts) {
   const dt = Math.min((ts - lastTS) / 1000, 0.05);
-  lastTS = ts;
-  totalTime += dt;
+  lastTS = ts; totalTime += dt;
 
   ctx.clearRect(0, 0, W, H);
-
-  const cx = W / 2;
-  const cy = H / 2;
-  const fl = (W / 2) / Math.tan(HFOV * Math.PI / 360);
+  const cx = W/2, cy = H/2;
+  const fl = (W/2) / Math.tan(HFOV * Math.PI / 360);
 
   const yaw = -camYaw;
-  const pitch = camPitch;
-  const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
-  const cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+  const cosY = Math.cos(yaw),   sinY = Math.sin(yaw);
+  const cosP = Math.cos(camPitch), sinP = Math.sin(camPitch);
 
   const visible = [];
-
   for (const p of particles) {
-    // ✨ 更丰富的空间漂浮动画：加入时间维度，让文字在 X 和 Z 轴也有微小游走
-    const t = totalTime * p.driftRate;
-    const bob = Math.sin(totalTime * BOB_HZ * p.bobRate * Math.PI * 2 + p.bobPhase) * BOB_PX;
-    const driftX = Math.cos(t * 1.3 + p.bobPhase) * p.driftX;
-    const driftZ = Math.sin(t * 0.9 + p.bobPhase) * p.driftZ;
+    const t2  = totalTime * p.driftRate;
+    const bob = Math.sin(totalTime * BOB_HZ * p.bobRate * Math.PI*2 + p.bobPhase) * BOB_PX;
+    const dx  = Math.cos(t2*1.1 + p.bobPhase) * p.driftX;
+    const dz  = Math.sin(t2*0.8 + p.bobPhase) * p.driftZ;
 
-    const wx = p.wx + driftX;
-    const wy = p.wy + bob;
-    const wz = p.wz + driftZ;
+    const wx = p.wx + dx,  wy = p.wy + bob,  wz = p.wz + dz;
 
-    const x1 = wx * cosY + wz * sinY;
-    const y1 = wy;
-    const z1 = -wx * sinY + wz * cosY;
-
-    const x2 = x1;
-    const y2 = y1 * cosP - z1 * sinP;
-    const z2 = y1 * sinP + z1 * cosP;
+    // yaw
+    const x1 =  wx*cosY + wz*sinY;
+    const y1 =  wy;
+    const z1 = -wx*sinY + wz*cosY;
+    // pitch
+    const x2 =  x1;
+    const y2 =  y1*cosP - z1*sinP;
+    const z2 =  y1*sinP + z1*cosP;
 
     if (z2 < 60) continue;
 
-    let scale = fl / z2;
-
-    const sx = cx + x2 * scale;
-    const sy = cy - y2 * scale;
-
+    const scale = fl / z2;
+    const sx = cx + x2*scale;
+    const sy = cy - y2*scale;
     const sw = p.iw * scale;
     const sh = p.ih * scale;
 
-    if (sw < 3.5 || sh < 3.5) continue;
-    if (sx + sw / 2 < -100 || sx - sw / 2 > W + 100) continue;
-    if (sy + sh / 2 < -100 || sy - sh / 2 > H + 100) continue;
+    if (sw < 4) continue;
+    if (sx+sw/2 < -50 || sx-sw/2 > W+50) continue;
+    if (sy+sh/2 < -50 || sy-sh/2 > H+50) continue;
 
-    const depthT = invLerp(MIN_DIST * 0.7, MAX_DIST, z2);
-    const alpha = lerp(1.0, 0.15, clamp(depthT, 0, 1));
+    const depthT = clamp((z2 - MIN_DIST*0.7) / (MAX_DIST - MIN_DIST*0.7), 0, 1);
+    const alpha  = 1.0 - depthT * 0.82;
 
-    visible.push({ p, sx, sy, sw, sh, z2, alpha });
+    visible.push({p, sx, sy, sw, sh, z2, alpha});
   }
 
-  visible.sort((a, b) => b.z2 - a.z2);
+  visible.sort((a,b) => b.z2 - a.z2);
 
-  for (const item of visible) {
-    const { p, sx, sy, sw, sh, alpha } = item;
+  for (const {p,sx,sy,sw,sh,alpha} of visible) {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(sx, sy);
     ctx.rotate(p.tilt);
-    ctx.drawImage(p.img, -sw / 2, -sh / 2, sw, sh);
+    ctx.drawImage(p.img, -sw/2, -sh/2, sw, sh);
     ctx.restore();
   }
 
   requestAnimationFrame(frame);
 }
 
-// UTILS
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-function lerp(a, b, t) { return a + (b - a) * t; }
-function invLerp(a, b, v) { if (a === b) return 0; return (v - a) / (b - a); }
+// ── UTILS ────────────────────────────────────────────────
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function deg(r){return (r*180/Math.PI).toFixed(1);}
+function dbg(msg){document.getElementById('dbg').textContent=msg;}
+function loadImg(src){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>res(img); img.onerror=()=>res(null); img.src=src;
+  });
+}
 </script>
 </body>
 </html>
