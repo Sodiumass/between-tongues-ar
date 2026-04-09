@@ -6,177 +6,457 @@
 <title>Between Tongues</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-html,body { width:100%; height:100%; overflow:hidden; background:#000; }
-#cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
-#c   { position:fixed; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; }
-#ui  {
-  position:fixed; inset:0; z-index:20;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  background:rgba(0,0,0,0.92); color:#fff; font-family:monospace;
-  text-align:center; padding:48px; gap:14px;
+html, body {
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#000;
 }
-#ui .sub { font-size:10px; color:#444; letter-spacing:0.22em; }
-#ui h1   { font-size:16px; font-weight:normal; }
-#ui p    { font-size:11px; color:#666; line-height:1.85; max-width:300px; }
+#cam {
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  z-index:0;
+}
+#c {
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:1;
+  pointer-events:none;
+}
+#ui {
+  position:fixed;
+  inset:0;
+  z-index:20;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.92);
+  color:#fff;
+  font-family:monospace;
+  text-align:center;
+  padding:48px;
+  gap:14px;
+}
+#ui .sub {
+  font-size:10px;
+  color:#444;
+  letter-spacing:0.22em;
+}
+#ui h1 {
+  font-size:16px;
+  font-weight:normal;
+}
+#ui p {
+  font-size:11px;
+  color:#666;
+  line-height:1.85;
+  max-width:320px;
+}
 #ui button {
-  margin-top:20px; padding:13px 44px; background:#E8503A;
-  color:#fff; border:none; font-family:monospace;
-  font-size:11px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
+  margin-top:20px;
+  padding:13px 44px;
+  background:#E8503A;
+  color:#fff;
+  border:none;
+  font-family:monospace;
+  font-size:11px;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+#dbg {
+  position:fixed;
+  left:8px;
+  bottom:8px;
+  z-index:30;
+  color:rgba(255,255,255,0.5);
+  font:10px/1.5 monospace;
+  background:rgba(0,0,0,0.28);
+  padding:6px 8px;
+  white-space:pre-line;
 }
 </style>
 </head>
 <body>
+
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="c"></canvas>
+
 <div id="ui">
   <div class="sub">谁在说话 · Who's Speaking? · C'est qui?</div>
   <h1>Between Tongues</h1>
   <p>Language drifts through the space.<br>Just watch.</p>
   <button onclick="start()">Enter ↗</button>
 </div>
+
+<div id="dbg">waiting…</div>
+
 <script>
+// ── ASSETS: 67 FILES ───────────────────────────────────
 const ASSETS = [
-  'toronto.png','WO.png','BAI.png','beijing.png',
-  'blue-bubble.png','blue-strip.png','BU.png',
-  'bubbleCN1.png','bubbleEN1.png','bubbleFR1.png',
-  'chinese-strip.png','english-strip.png','face3.png',
-  'green-bubble.png','igotit.png','jsuis-perdu.png',
-  'MING.png','montreal.png','red-bubble.png','SOS3.png'
+  'BAI.png',
+  'beijing.png',
+  'blue-bubble.png',
+  'BU.png',
+
+  'bubbleCN1.png',
+  'bubbleCN2.png',
+  'bubbleCN3.png',
+  'bubbleCN4.png',
+
+  'bubbleEN1.png',
+  'bubbleEN2.png',
+  'bubbleEN3.png',
+  'bubbleEN4.png',
+  'bubbleEN5.png',
+
+  'bubbleFR1.png',
+  'bubbleFR2.png',
+  'bubbleFR3.png',
+  'bubbleFR4.png',
+
+  'emoji.png',
+  'etalors.png',
+  'face3.png',
+  'green-bubble.png',
+  'igotit.png',
+  'ithink.png',
+  'jsuis-perdu.png',
+  'LUANMA.png',
+  'maaybe.png',
+  'MING.png',
+
+  'mini1.png',
+  'mini2.png',
+  'mini3.png',
+  'mini4.png',
+  'mini5.png',
+  'mini6.png',
+  'mini7.png',
+  'mini8.png',
+  'mini9.png',
+  'mini10.png',
+  'mini11.png',
+  'mini12.png',
+  'mini13.png',
+  'mini14.png',
+  'mini15.png',
+  'mini16.png',
+  'mini17.png',
+
+  'montreal.png',
+
+  'noise1.png',
+  'noise2.png',
+  'noise3.png',
+  'noise4.png',
+  'noise5.png',
+  'noise6.png',
+  'noise7.png',
+  'noise8.png',
+  'noise9.png',
+  'noise10.png',
+  'noise11.png',
+  'noise12.png',
+
+  'red-bubble.png',
+  'SOS3.png',
+  'toronto.png',
+
+  'wiggleEN1.png',
+  'wiggleEN2.png',
+  'wiggleEN3.png',
+  'wiggleFR1.png',
+  'wiggleFR2.png',
+
+  'WO.png',
+  'YANWENZI.png'
 ];
 
-// ── CONFIG ───────────────────────────────────────────────
-// Reference: if an image is 1000px wide natively,
-// it will display at REF_PX * (1000/REF_NATIVE) * depthScale
-// REF_NATIVE is the "medium" image width in your canvas exports
-// All images were exported from the same canvas so their px sizes
-// are proportional — we just need one global scale factor.
-const REF_SCALE = 0.00018; // tweak this one number to make everything bigger/smaller
-// e.g. a 1000px-wide image → 1000 * 0.00018 * screenW
+// ── CONFIG ─────────────────────────────────────────────
+// 这版不再让所有图片持续匀速乱跑，而是围绕锚点漂浮
+const REF_SCALE = 0.00024;   // 比之前更大一点
+const N_COPIES  = 1;         // 每张图只出现一次，先保流畅
+const FLOAT_HZ  = 0.10;      // 慢漂频率
+const BOB_HZ    = 0.34;      // 轻弹频率
+const FLOAT_AMT = 22;        // 慢漂幅度
+const BOB_AMT   = 8;         // 轻弹幅度
+const SWAY_AMT  = 12;        // 左右轻摆幅度
 
-const N_COPIES  = 3;    // how many times each image appears (spread across screen)
-const BOB_HZ    = 0.15; // bobs per second — slow breath
-const BOB_AMT   = 18;   // px bob amplitude (screen pixels)
+// 限制 DPR，减少手机掉帧
+const MAX_DPR = 1.5;
 
-// depth layers — each particle gets assigned one
+// depth layers
 const DEPTH_LAYERS = [
-  { scale:1.00, opacity:0.95, speed:55 }, // near
-  { scale:0.65, opacity:0.78, speed:38 }, // mid
-  { scale:0.38, opacity:0.52, speed:22 }, // far
-  { scale:0.20, opacity:0.28, speed:12 }, // very far
+  { scale:1.00, opacity:0.95 },
+  { scale:0.70, opacity:0.76 },
+  { scale:0.44, opacity:0.48 }
 ];
+
+// 每张图自己的大小权重
+const IMAGE_SCALE = {
+  'BAI.png': 0.95,
+  'beijing.png': 1.20,
+  'blue-bubble.png': 1.06,
+  'BU.png': 0.95,
+
+  'bubbleCN1.png': 0.95,
+  'bubbleCN2.png': 0.95,
+  'bubbleCN3.png': 0.95,
+  'bubbleCN4.png': 0.95,
+
+  'bubbleEN1.png': 0.95,
+  'bubbleEN2.png': 0.95,
+  'bubbleEN3.png': 0.95,
+  'bubbleEN4.png': 0.95,
+  'bubbleEN5.png': 0.95,
+
+  'bubbleFR1.png': 0.95,
+  'bubbleFR2.png': 0.95,
+  'bubbleFR3.png': 0.95,
+  'bubbleFR4.png': 0.95,
+
+  'emoji.png': 1.00,
+  'etalors.png': 1.05,
+  'face3.png': 1.24,
+  'green-bubble.png': 1.08,
+  'igotit.png': 0.95,
+  'ithink.png': 1.00,
+  'jsuis-perdu.png': 1.00,
+  'LUANMA.png': 1.12,
+  'maaybe.png': 1.00,
+  'MING.png': 1.00,
+
+  'mini1.png': 0.76,
+  'mini2.png': 0.76,
+  'mini3.png': 0.76,
+  'mini4.png': 0.76,
+  'mini5.png': 0.76,
+  'mini6.png': 0.76,
+  'mini7.png': 0.76,
+  'mini8.png': 0.76,
+  'mini9.png': 0.76,
+  'mini10.png': 0.76,
+  'mini11.png': 0.76,
+  'mini12.png': 0.76,
+  'mini13.png': 0.76,
+  'mini14.png': 0.76,
+  'mini15.png': 0.76,
+  'mini16.png': 0.76,
+  'mini17.png': 0.76,
+
+  'montreal.png': 1.12,
+
+  'noise1.png': 0.82,
+  'noise2.png': 0.82,
+  'noise3.png': 0.82,
+  'noise4.png': 0.82,
+  'noise5.png': 0.82,
+  'noise6.png': 0.82,
+  'noise7.png': 0.82,
+  'noise8.png': 0.82,
+  'noise9.png': 0.82,
+  'noise10.png': 0.82,
+  'noise11.png': 0.82,
+  'noise12.png': 0.82,
+
+  'red-bubble.png': 1.08,
+  'SOS3.png': 1.00,
+  'toronto.png': 1.16,
+
+  'wiggleEN1.png': 0.92,
+  'wiggleEN2.png': 0.92,
+  'wiggleEN3.png': 0.92,
+  'wiggleFR1.png': 0.92,
+  'wiggleFR2.png': 0.92,
+
+  'WO.png': 1.00,
+  'YANWENZI.png': 1.10
+};
 
 let canvas, ctx, W, H, dpr;
-let imgs = [], particles = [];
-let lastTS = 0, T = 0;
+let imgs = [];
+let particles = [];
+let lastTS = 0;
+let T = 0;
 
+// ── START ──────────────────────────────────────────────
 async function start() {
   document.getElementById('ui').style.display = 'none';
+
   canvas = document.getElementById('c');
-  ctx    = canvas.getContext('2d');
+  ctx = canvas.getContext('2d');
+
   resize();
-  window.addEventListener('resize', () => { resize(); spawn(); });
+  window.addEventListener('resize', () => {
+    resize();
+    spawn();
+  });
 
   try {
     const s = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:{ideal:'environment'} }, audio:false
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
     });
     document.getElementById('cam').srcObject = s;
-  } catch(e) {}
+  } catch (e) {}
 
-  imgs = (await Promise.all(ASSETS.map(n => new Promise(res => {
-    const img = new Image();
-    img.onload  = () => res(img);
-    img.onerror = () => res(null);
-    img.src = './assets/' + n;
-  })))).filter(Boolean);
+  imgs = (await Promise.all(
+    ASSETS.map(name => new Promise(res => {
+      const img = new Image();
+      img.onload = () => {
+        img._srcName = name;
+        res(img);
+      };
+      img.onerror = () => {
+        console.warn('Failed to load:', name);
+        res(null);
+      };
+      img.src = './assets/' + name;
+    }))
+  )).filter(Boolean);
+
+  console.log('ASSETS:', ASSETS.length);
+  console.log('LOADED:', imgs.length);
+
+  document.getElementById('dbg').textContent =
+    `assets listed: ${ASSETS.length}\nloaded: ${imgs.length}`;
 
   spawn();
   requestAnimationFrame(loop);
 }
 
+// ── SPAWN ──────────────────────────────────────────────
 function spawn() {
   particles = [];
   if (!imgs.length) return;
 
-  imgs.forEach(img => {
-    // base display size: proportional to natural px, scaled to screen
-    const baseW = img.naturalWidth  * REF_SCALE * W;
-    const baseH = img.naturalHeight * REF_SCALE * W;
+  imgs.forEach((img, index) => {
+    const imgScale = IMAGE_SCALE[img._srcName] ?? 1;
+
+    // 用原图像素比例 × 全局比例 × 自定义权重
+    const baseW = img.naturalWidth  * REF_SCALE * W * imgScale;
+    const baseH = img.naturalHeight * REF_SCALE * W * imgScale;
 
     for (let copy = 0; copy < N_COPIES; copy++) {
-      // assign depth layer — distribute evenly across copies + randomness
-      const layerIdx = Math.floor(Math.random() * DEPTH_LAYERS.length);
-      const layer    = DEPTH_LAYERS[layerIdx];
+      const layerIdx = weightedLayerIndex();
+      const layer = DEPTH_LAYERS[layerIdx];
 
       const pw = baseW * layer.scale;
       const ph = baseH * layer.scale;
 
-      // start anywhere on screen (including just offscreen)
-      const x = (Math.random() * 1.4 - 0.2) * W;
-      const y = (Math.random() * 1.2 - 0.1) * H;
-
-      // random direction — any angle, not just left/right
-      const angle = Math.random() * Math.PI * 2;
-      const spd   = layer.speed * (0.7 + Math.random() * 0.6);
-      const vx    = Math.cos(angle) * spd;
-      const vy    = Math.sin(angle) * spd * 0.5; // slightly less vertical movement
+      // 锚点分布：大多数在屏幕内，少数轻微出边
+      const ax = (Math.random() * 1.14 - 0.07) * W;
+      const ay = (Math.random() * 0.96 + 0.04) * H;
 
       particles.push({
-        img, pw, ph,
-        x, y, vx, vy,
-        opacity  : layer.opacity,
-        tilt     : (Math.random() - 0.5) * 0.2,
-        bobPhase : Math.random() * Math.PI * 2,
-        bobRate  : 0.6 + Math.random() * 0.8,
+        img,
+        pw,
+        ph,
+        ax,
+        ay,
+        opacity: layer.opacity,
         layerIdx,
+
+        // 基础角度 + 很小的摆动角度
+        tiltBase: (Math.random() - 0.5) * 0.10,
+        tiltAmt: 0.02 + Math.random() * 0.05,
+
+        // 慢漂
+        floatPhaseX: Math.random() * Math.PI * 2,
+        floatPhaseY: Math.random() * Math.PI * 2,
+        floatRateX: 0.65 + Math.random() * 0.55,
+        floatRateY: 0.65 + Math.random() * 0.55,
+
+        // 轻弹
+        bobPhase: Math.random() * Math.PI * 2,
+        bobRate: 0.90 + Math.random() * 0.80,
+
+        // 左右轻摆
+        swayPhase: Math.random() * Math.PI * 2,
+        swayRate: 0.75 + Math.random() * 0.70,
       });
     }
   });
 
-  // sort far→near so near elements draw on top
-  particles.sort((a,b) => b.layerIdx - a.layerIdx);
+  // far -> near
+  particles.sort((a, b) => b.layerIdx - a.layerIdx);
 }
 
+// 让近层多一点，远层少一点
+function weightedLayerIndex() {
+  const r = Math.random();
+  if (r < 0.46) return 0; // near
+  if (r < 0.80) return 1; // mid
+  return 2;               // far
+}
+
+// ── RESIZE ─────────────────────────────────────────────
 function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  dpr = window.devicePixelRatio || 1;
-  canvas.width  = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W+'px'; canvas.style.height = H+'px';
-  ctx.setTransform(1,0,0,1,0,0);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  ctx.imageSmoothingQuality = 'medium';
 }
 
+// ── LOOP ───────────────────────────────────────────────
 function loop(ts) {
   const dt = Math.min((ts - lastTS) / 1000, 0.05);
-  lastTS = ts; T += dt;
+  lastTS = ts;
+  T += dt;
 
   ctx.clearRect(0, 0, W, H);
 
-  particles.forEach(p => {
-    // move in own direction
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
+  for (const p of particles) {
+    // 慢漂：像浮在空气中
+    const floatX =
+      Math.sin(T * FLOAT_HZ * p.floatRateX * Math.PI * 2 + p.floatPhaseX) * FLOAT_AMT;
 
-    // bob on top of y movement
-    const bob = Math.sin(T * BOB_HZ * p.bobRate * Math.PI * 2 + p.bobPhase) * BOB_AMT;
+    const floatY =
+      Math.cos(T * FLOAT_HZ * p.floatRateY * Math.PI * 2 + p.floatPhaseY) * FLOAT_AMT * 0.72;
 
-    // wrap around when fully offscreen
-    const mx = p.pw * 0.6;
-    const my = p.ph * 0.6;
-    if (p.x >  W + mx) p.x = -mx;
-    if (p.x < -mx - p.pw) p.x = W + mx;
-    if (p.y >  H + my) p.y = -my;
-    if (p.y < -my - p.ph) p.y = H + my;
+    // 小幅弹跳
+    const bobY =
+      Math.sin(T * BOB_HZ * p.bobRate * Math.PI * 2 + p.bobPhase) * BOB_AMT;
+
+    // 横向轻摆
+    const swayX =
+      Math.sin(T * 0.22 * p.swayRate * Math.PI * 2 + p.swayPhase) * SWAY_AMT;
+
+    // 微微摆头
+    const tilt =
+      p.tiltBase +
+      Math.sin(T * 0.18 * Math.PI * 2 + p.swayPhase) * p.tiltAmt;
+
+    const x = p.ax + floatX + swayX;
+    const y = p.ay + floatY + bobY;
+
+    // 轻微屏外裁剪，减少无意义绘制
+    if (x + p.pw / 2 < -140 || x - p.pw / 2 > W + 140) continue;
+    if (y + p.ph / 2 < -140 || y - p.ph / 2 > H + 140) continue;
 
     ctx.save();
     ctx.globalAlpha = p.opacity;
-    ctx.translate(p.x, p.y + bob);
-    ctx.rotate(p.tilt);
-    ctx.drawImage(p.img, -p.pw/2, -p.ph/2, p.pw, p.ph);
+    ctx.translate(x, y);
+    ctx.rotate(tilt);
+    ctx.drawImage(p.img, -p.pw / 2, -p.ph / 2, p.pw, p.ph);
     ctx.restore();
-  });
+  }
 
   requestAnimationFrame(loop);
 }
