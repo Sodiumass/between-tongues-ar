@@ -8,7 +8,7 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { width:100%; height:100%; overflow:hidden; background:#000; }
 #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
-#three-canvas { position:fixed; inset:0; width:100%; height:100%; z-index:1; }
+#three-canvas { position:fixed; inset:0; z-index:1; }
 #ui {
   position:fixed; inset:0; z-index:20;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -47,21 +47,24 @@ const ASSETS = [
 ];
 
 // ── CONFIG ───────────────────────────────────────────────
-const N_COPIES   = 3;      // copies of each image in the scene
-const WORLD_SIZE = 8;      // scene spread radius
-const REF_WIDTH  = 2.2;    // reference plane width at z=0 for a 1000px-wide image
-const SPEED      = 0.18;   // drift speed (world units/sec)
-const BOB_HZ     = 0.15;   // bobs per second
-const BOB_AMT    = 0.08;   // bob amplitude (world units)
+const N_COPIES  = 3;      // copies of each image
+const SPREAD    = 10;     // world space spread radius
+const REF_WIDTH = 0.9;    // ref display width for a 1000px-wide image — smaller = all smaller
+const SPEED     = 0.55;   // drift speed — feather-like
+const BOB_HZ    = 0.22;
+const BOB_AMT   = 0.12;
 
-let renderer, scene, camera;
-let planes = [];
-let clock;
+// max rotation speed per axis (radians/sec) — makes things tumble gently
+const ROT_X_MAX = 0.008;
+const ROT_Y_MAX = 0.012;
+const ROT_Z_MAX = 0.005;
+
+let renderer, scene, camera, clock;
+let meshes = [];
 
 async function start() {
   document.getElementById('ui').style.display = 'none';
 
-  // camera feed
   try {
     const s = await navigator.mediaDevices.getUserMedia({
       video:{ facingMode:{ideal:'environment'} }, audio:false
@@ -69,21 +72,18 @@ async function start() {
     document.getElementById('cam').srcObject = s;
   } catch(e) {}
 
-  // Three.js setup — transparent canvas over video
   const canvas = document.getElementById('three-canvas');
   renderer = new THREE.WebGLRenderer({
-    canvas,
-    alpha: true,          // transparent bg → camera shows through
-    antialias: true,
-    powerPreference: 'low-power',  // save battery
+    canvas, alpha:true, antialias:true, powerPreference:'low-power'
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000, 0);  // fully transparent
+  renderer.setClearColor(0x000000, 0);
+  renderer.sortObjects = true;
 
   scene  = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0, 5);
+  camera.position.set(0, 0, 6);
 
   clock = new THREE.Clock();
 
@@ -93,65 +93,74 @@ async function start() {
     camera.updateProjectionMatrix();
   });
 
-  // load textures + create planes
   const loader = new THREE.TextureLoader();
+
   await Promise.all(ASSETS.map(name => new Promise(res => {
-    loader.load('./assets/' + name,
-      tex => {
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        const img = tex.image;
-        const ratio = img.height / img.width;
+    loader.load('./assets/' + name, tex => {
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      const iw = tex.image.width;
+      const ih = tex.image.height;
+      const ratio = ih / iw;
 
-        for (let c = 0; c < N_COPIES; c++) {
-          // size proportional to natural px width
-          const w = (img.width / 1000) * REF_WIDTH * (0.7 + Math.random() * 0.6);
-          const h = w * ratio;
+      for (let c = 0; c < N_COPIES; c++) {
+        // size: proportional to natural px, with per-copy variance
+        const sizeVar = 0.65 + Math.random() * 0.7;
+        const w = (iw / 1000) * REF_WIDTH * sizeVar;
+        const h = w * ratio;
 
-          const geo = new THREE.PlaneGeometry(w, h);
-          const mat = new THREE.MeshBasicMaterial({
-            map: tex,
-            transparent: true,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          });
-          const mesh = new THREE.Mesh(geo, mat);
+        const geo = new THREE.PlaneGeometry(w, h);
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          opacity: 0.82,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = Math.random(); // avoid z-fighting flicker
 
-          // random position in 3D space
-          mesh.position.set(
-            (Math.random() - 0.5) * WORLD_SIZE * 2,
-            (Math.random() - 0.5) * WORLD_SIZE,
-            (Math.random() - 0.5) * WORLD_SIZE * 1.5
-          );
+        // scatter in 3D space
+        mesh.position.set(
+          (Math.random() - 0.5) * SPREAD * 2,
+          (Math.random() - 0.5) * SPREAD,
+          (Math.random() - 0.5) * SPREAD * 1.8
+        );
 
-          // slight random tilt
-          mesh.rotation.z = (Math.random() - 0.5) * 0.3;
-          mesh.rotation.y = (Math.random() - 0.5) * 0.15;
+        // initial random rotation — not all facing camera
+        mesh.rotation.set(
+          (Math.random() - 0.5) * Math.PI * 0.6,  // tip forward/back
+          (Math.random() - 0.5) * Math.PI * 0.8,  // face sideways
+          (Math.random() - 0.5) * Math.PI * 0.4   // roll
+        );
 
-          // depth-based opacity
-          const depth = (mesh.position.z + WORLD_SIZE) / (WORLD_SIZE * 2); // 0=back, 1=front
-          mat.opacity = 0.25 + depth * 0.7;
+        // drift velocity — feather-like random direction
+        const angle = Math.random() * Math.PI * 2;
+        const spd   = SPEED * (0.4 + Math.random() * 0.9);
+        const vx    = Math.cos(angle) * spd;
+        const vy    = (Math.random() - 0.5) * spd * 0.35;
+        const vz    = (Math.random() - 0.5) * spd * 0.25;
 
-          // drift velocity — random direction
-          const angle = Math.random() * Math.PI * 2;
-          const spd   = SPEED * (0.5 + Math.random() * 0.8);
-          mesh.userData = {
-            vx: Math.cos(angle) * spd,
-            vy: Math.sin(angle) * spd * 0.4,
-            vz: (Math.random() - 0.5) * spd * 0.2,
-            bobPhase: Math.random() * Math.PI * 2,
-            bobRate:  0.6 + Math.random() * 0.8,
-            baseY: mesh.position.y,
-          };
+        // independent rotation speed per axis — gentle tumble
+        const rx = (Math.random() - 0.5) * 2 * ROT_X_MAX;
+        const ry = (Math.random() - 0.5) * 2 * ROT_Y_MAX;
+        const rz = (Math.random() - 0.5) * 2 * ROT_Z_MAX;
 
-          scene.add(mesh);
-          planes.push(mesh);
-        }
-        res();
-      },
-      undefined,
-      () => res()
-    );
+        // bob
+        const bobPhase = Math.random() * Math.PI * 2;
+        const bobRate  = 0.6 + Math.random() * 0.8;
+        const baseY    = mesh.position.y;
+
+        // occasional direction wobble
+        const wobblePhase = Math.random() * Math.PI * 2;
+        const wobbleAmt   = (Math.random() - 0.5) * 0.08;
+
+        mesh.userData = { vx, vy, vz, rx, ry, rz, bobPhase, bobRate, baseY, wobblePhase, wobbleAmt };
+        scene.add(mesh);
+        meshes.push(mesh);
+      }
+      res();
+    }, undefined, () => res());
   })));
 
   animate();
@@ -159,31 +168,35 @@ async function start() {
 
 function animate() {
   requestAnimationFrame(animate);
-  const dt = clock.getDelta();
+  const dt = Math.min(clock.getDelta(), 0.05);
   const t  = clock.getElapsedTime();
+  const H  = SPREAD;
 
-  const half = WORLD_SIZE;
+  meshes.forEach(m => {
+    const d = m.userData;
 
-  planes.forEach(mesh => {
-    const d = mesh.userData;
+    // feather wobble — slight direction change over time
+    const wobble = Math.sin(t * 0.4 + d.wobblePhase) * d.wobbleAmt;
 
-    // drift
-    mesh.position.x += d.vx * dt;
-    mesh.position.z += d.vz * dt;
+    m.position.x += (d.vx + wobble) * dt;
+    m.position.y  = d.baseY + Math.sin(t * BOB_HZ * d.bobRate * Math.PI * 2 + d.bobPhase) * BOB_AMT;
+    m.position.z += d.vz * dt;
 
-    // bob
-    const bob = Math.sin(t * BOB_HZ * d.bobRate * Math.PI * 2 + d.bobPhase) * BOB_AMT;
-    mesh.position.y = d.baseY + bob;
+    // gentle tumble on all three axes
+    m.rotation.x += d.rx * dt * 60;
+    m.rotation.y += d.ry * dt * 60;
+    m.rotation.z += d.rz * dt * 60;
 
-    // wrap in X and Z
-    if (mesh.position.x >  half * 2) mesh.position.x = -half * 2;
-    if (mesh.position.x < -half * 2) mesh.position.x =  half * 2;
-    if (mesh.position.z >  half * 2) mesh.position.z = -half * 2;
-    if (mesh.position.z < -half * 2) mesh.position.z =  half * 2;
+    // wrap X and Z — seamless loop
+    const lim = H * 2;
+    if (m.position.x >  lim) { m.position.x = -lim; d.baseY = (Math.random()-0.5)*H; }
+    if (m.position.x < -lim) { m.position.x =  lim; d.baseY = (Math.random()-0.5)*H; }
+    if (m.position.z >  H*2) { m.position.z = -H*2; }
+    if (m.position.z < -H*2) { m.position.z =  H*2; }
 
-    // update opacity by depth
-    const depth = (mesh.position.z + half * 1.5) / (half * 3);
-    mesh.material.opacity = Math.max(0.1, Math.min(0.95, 0.15 + depth * 0.8));
+    // depth-based opacity — far is more transparent
+    const depth = (m.position.z + H * 1.5) / (H * 3.0);
+    m.material.opacity = Math.max(0.08, Math.min(0.90, 0.12 + depth * 0.78));
   });
 
   renderer.render(scene, camera);
