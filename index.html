@@ -6,7 +6,7 @@
 <title>Between Tongues</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-html,body { width:100%; height:100%; overflow:hidden; background:#000; }
+html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
 #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
 #three-canvas { position:fixed; inset:0; z-index:1; }
 #ui {
@@ -19,7 +19,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#000; }
 #ui h1   { font-size:16px; font-weight:normal; }
 #ui p    { font-size:11px; color:#666; line-height:1.85; max-width:300px; }
 #ui button {
-  margin-top:20px; padding:13px 44px; background:#E8503A;
+  margin-top:20px; padding:13px 44px; background: linear-gradient(135deg, #E8503A 0%, #4A9EBF 50%, #8BBF3A 100%);
   color:#fff; border:none; font-family:monospace;
   font-size:11px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
 }
@@ -29,9 +29,10 @@ html,body { width:100%; height:100%; overflow:hidden; background:#000; }
 <video id="cam" autoplay playsinline muted></video>
 <canvas id="three-canvas"></canvas>
 <div id="ui">
-  <div class="sub">谁在说话 · Who's Speaking? · C'est qui?</div>
-  <h1>Between Tongues</h1>
-  <p>Language drifts through the space.<br>Just watch.</p>
+  
+  <h1>舌间 / Between Tongues / Entre les langues</h1>
+  <p>语言漂浮在我们之间。 / Language drifts between us. / Les langues dérivent entre nous.</p>
+  <div class="sub">滑动屏幕，探索不同角度 <br> Swipe to explore different angles  <br> Faites glisser pour explorer différents angles C'est qui?</div>
   <button onclick="start()">Enter ↗</button>
 </div>
 
