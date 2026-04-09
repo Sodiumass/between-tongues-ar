@@ -113,9 +113,10 @@ async function start() {
 
   const canvas = document.getElementById('three-canvas');
   renderer = new THREE.WebGLRenderer({
-    canvas, alpha:true, antialias:true, powerPreference:'low-power'
+    canvas, alpha:true, antialias:true, powerPreference:'high-performance'
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const isAndroid = /android/i.test(navigator.userAgent);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isAndroid ? 1.5 : 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setClearColor(0x000000, 0);
   renderer.sortObjects = true;
