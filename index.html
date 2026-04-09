@@ -7,23 +7,16 @@
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { width:100%; height:100%; overflow:hidden; background:#000; }
-#cam {
-  position:fixed; inset:0; width:100%; height:100%;
-  object-fit:cover; z-index:0;
-}
-#c {
-  position:fixed; inset:0; width:100%; height:100%;
-  z-index:1; pointer-events:none;
-}
-#ui {
+#cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
+#c   { position:fixed; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; }
+#ui  {
   position:fixed; inset:0; z-index:20;
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  background:rgba(0,0,0,0.92); color:#fff;
-  font-family:monospace; text-align:center; padding:48px; gap:14px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.92); color:#fff; font-family:monospace;
+  text-align:center; padding:48px; gap:14px;
 }
 #ui .sub { font-size:10px; color:#444; letter-spacing:0.22em; }
-#ui h1   { font-size:16px; font-weight:normal; letter-spacing:0.04em; }
+#ui h1   { font-size:16px; font-weight:normal; }
 #ui p    { font-size:11px; color:#666; line-height:1.85; max-width:300px; }
 #ui button {
   margin-top:20px; padding:13px 44px; background:#E8503A;
@@ -41,9 +34,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#000; }
   <p>Language drifts through the space.<br>Just watch.</p>
   <button onclick="start()">Enter ↗</button>
 </div>
-
 <script>
-// ── ASSETS ───────────────────────────────────────────────
 const ASSETS = [
   'toronto.png','WO.png','BAI.png','beijing.png',
   'blue-bubble.png','blue-strip.png','BU.png',
@@ -54,37 +45,37 @@ const ASSETS = [
 ];
 
 // ── CONFIG ───────────────────────────────────────────────
-// How big each element appears — fraction of screen width
-// Near layer: ~0.28 of screen width. Far layer: ~0.12.
-const LAYERS = [
-  { count:6,  scale:0.28, speed:0.18, opacity:0.95, z:1.0 }, // near
-  { count:10, scale:0.20, speed:0.13, opacity:0.80, z:0.7 }, // mid
-  { count:12, scale:0.13, speed:0.08, opacity:0.55, z:0.4 }, // far
-  { count:10, scale:0.08, speed:0.04, opacity:0.30, z:0.2 }, // very far
+// Reference: if an image is 1000px wide natively,
+// it will display at REF_PX * (1000/REF_NATIVE) * depthScale
+// REF_NATIVE is the "medium" image width in your canvas exports
+// All images were exported from the same canvas so their px sizes
+// are proportional — we just need one global scale factor.
+const REF_SCALE = 0.00018; // tweak this one number to make everything bigger/smaller
+// e.g. a 1000px-wide image → 1000 * 0.00018 * screenW
+
+const N_COPIES  = 3;    // how many times each image appears (spread across screen)
+const BOB_HZ    = 0.15; // bobs per second — slow breath
+const BOB_AMT   = 18;   // px bob amplitude (screen pixels)
+
+// depth layers — each particle gets assigned one
+const DEPTH_LAYERS = [
+  { scale:1.00, opacity:0.95, speed:55 }, // near
+  { scale:0.65, opacity:0.78, speed:38 }, // mid
+  { scale:0.38, opacity:0.52, speed:22 }, // far
+  { scale:0.20, opacity:0.28, speed:12 }, // very far
 ];
 
-const BOB_HZ  = 0.18;  // bobs per second
-const BOB_AMT = 0.012; // bob as fraction of screen height
-const DRIFT_X = 0.006; // gentle horizontal drift per second (fraction of W)
-
-// ── STATE ────────────────────────────────────────────────
 let canvas, ctx, W, H, dpr;
-let imgs = [];
-let particles = [];
+let imgs = [], particles = [];
 let lastTS = 0, T = 0;
 
-// ── START ────────────────────────────────────────────────
 async function start() {
   document.getElementById('ui').style.display = 'none';
-
   canvas = document.getElementById('c');
   ctx    = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
   resize();
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', () => { resize(); spawn(); });
 
-  // camera
   try {
     const s = await navigator.mediaDevices.getUserMedia({
       video:{ facingMode:{ideal:'environment'} }, audio:false
@@ -92,108 +83,98 @@ async function start() {
     document.getElementById('cam').srcObject = s;
   } catch(e) {}
 
-  // load all images
-  imgs = (await Promise.all(
-    ASSETS.map(n => new Promise(res => {
-      const img = new Image();
-      img.onload  = () => res(img);
-      img.onerror = () => res(null);
-      img.src = './assets/' + n;
-    }))
-  )).filter(Boolean);
+  imgs = (await Promise.all(ASSETS.map(n => new Promise(res => {
+    const img = new Image();
+    img.onload  = () => res(img);
+    img.onerror = () => res(null);
+    img.src = './assets/' + n;
+  })))).filter(Boolean);
 
   spawn();
   requestAnimationFrame(loop);
 }
 
-// ── SPAWN ────────────────────────────────────────────────
 function spawn() {
   particles = [];
   if (!imgs.length) return;
 
-  // shuffle so different images appear in each layer
-  const shuffled = [...imgs].sort(() => Math.random() - 0.5);
-  let imgIdx = 0;
+  imgs.forEach(img => {
+    // base display size: proportional to natural px, scaled to screen
+    const baseW = img.naturalWidth  * REF_SCALE * W;
+    const baseH = img.naturalHeight * REF_SCALE * W;
 
-  LAYERS.forEach(layer => {
-    for (let i = 0; i < layer.count; i++) {
-      const img = shuffled[imgIdx++ % shuffled.length];
-      const pw  = W * layer.scale;
-      const ph  = pw * (img.naturalHeight / img.naturalWidth);
+    for (let copy = 0; copy < N_COPIES; copy++) {
+      // assign depth layer — distribute evenly across copies + randomness
+      const layerIdx = Math.floor(Math.random() * DEPTH_LAYERS.length);
+      const layer    = DEPTH_LAYERS[layerIdx];
 
-      // start at random position across screen + offscreen on both sides
-      const x = Math.random() * (W + pw * 2) - pw;
-      const y = Math.random() * H;
+      const pw = baseW * layer.scale;
+      const ph = baseH * layer.scale;
 
-      // each element drifts in one direction (left or right) forever,
-      // wrapping around when it exits the screen
-      const dir = Math.random() < 0.5 ? 1 : -1;
+      // start anywhere on screen (including just offscreen)
+      const x = (Math.random() * 1.4 - 0.2) * W;
+      const y = (Math.random() * 1.2 - 0.1) * H;
+
+      // random direction — any angle, not just left/right
+      const angle = Math.random() * Math.PI * 2;
+      const spd   = layer.speed * (0.7 + Math.random() * 0.6);
+      const vx    = Math.cos(angle) * spd;
+      const vy    = Math.sin(angle) * spd * 0.5; // slightly less vertical movement
 
       particles.push({
         img, pw, ph,
-        x, y,
-        baseY  : y,
-        dir,
-        speed  : layer.speed,   // fraction of W per second
-        opacity: layer.opacity,
-        bobPhase: Math.random() * Math.PI * 2,
-        bobRate : 0.7 + Math.random() * 0.6,
-        tilt   : (Math.random() - 0.5) * 0.18,
-        // subtle size breath
-        sizePhase: Math.random() * Math.PI * 2,
+        x, y, vx, vy,
+        opacity  : layer.opacity,
+        tilt     : (Math.random() - 0.5) * 0.2,
+        bobPhase : Math.random() * Math.PI * 2,
+        bobRate  : 0.6 + Math.random() * 0.8,
+        layerIdx,
       });
     }
   });
+
+  // sort far→near so near elements draw on top
+  particles.sort((a,b) => b.layerIdx - a.layerIdx);
 }
 
-// ── RESIZE ───────────────────────────────────────────────
 function resize() {
-  W   = window.innerWidth;
-  H   = window.innerHeight;
+  W = window.innerWidth; H = window.innerHeight;
   dpr = window.devicePixelRatio || 1;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
+  canvas.width  = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
   ctx.setTransform(1,0,0,1,0,0);
   ctx.scale(dpr, dpr);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  // respawn to fit new dimensions
-  if (imgs.length) spawn();
 }
 
-// ── RENDER LOOP ──────────────────────────────────────────
 function loop(ts) {
   const dt = Math.min((ts - lastTS) / 1000, 0.05);
-  lastTS = ts;
-  T += dt;
+  lastTS = ts; T += dt;
 
   ctx.clearRect(0, 0, W, H);
 
-  // draw far → near (layers are already in far→near order in LAYERS)
-  // particles are also in that order from spawn()
   particles.forEach(p => {
-    // drift horizontally, wrap
-    p.x += p.dir * p.speed * W * dt;
-    const margin = p.pw * 1.2;
-    if (p.dir > 0 && p.x - p.pw/2 > W + margin) p.x = -margin;
-    if (p.dir < 0 && p.x + p.pw/2 < -margin)      p.x = W + margin;
+    // move in own direction
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
 
-    // gentle bob
-    const bob = Math.sin(T * BOB_HZ * p.bobRate * Math.PI * 2 + p.bobPhase) * BOB_AMT * H;
-    const sy  = p.baseY + bob;
+    // bob on top of y movement
+    const bob = Math.sin(T * BOB_HZ * p.bobRate * Math.PI * 2 + p.bobPhase) * BOB_AMT;
 
-    // subtle size breath (±3%)
-    const sizeBreath = 1 + Math.sin(T * 0.3 + p.sizePhase) * 0.03;
-    const pw = p.pw * sizeBreath;
-    const ph = p.ph * sizeBreath;
+    // wrap around when fully offscreen
+    const mx = p.pw * 0.6;
+    const my = p.ph * 0.6;
+    if (p.x >  W + mx) p.x = -mx;
+    if (p.x < -mx - p.pw) p.x = W + mx;
+    if (p.y >  H + my) p.y = -my;
+    if (p.y < -my - p.ph) p.y = H + my;
 
     ctx.save();
     ctx.globalAlpha = p.opacity;
-    ctx.translate(p.x, sy);
+    ctx.translate(p.x, p.y + bob);
     ctx.rotate(p.tilt);
-    ctx.drawImage(p.img, -pw/2, -ph/2, pw, ph);
+    ctx.drawImage(p.img, -p.pw/2, -p.ph/2, p.pw, p.ph);
     ctx.restore();
   });
 
