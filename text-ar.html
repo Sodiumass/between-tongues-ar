@@ -12,7 +12,7 @@
 
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
+html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; font-family: sans-serif; }
 #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
 #three-canvas { position:fixed; inset:0; z-index:1; }
 
@@ -20,8 +20,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
   position:fixed; inset:0; z-index:20;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   background:#f0ede8;
-  color:#111; font-family:serif;
-  text-align:center; padding:48px; gap:10px;
+  color:#111; text-align:center; padding:48px; gap:10px;
 }
 
 #ui button {
@@ -62,25 +61,25 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 
-const DPR = Math.min(window.devicePixelRatio || 1, 2); // 手机端限制DPR为2，平衡清晰度与性能
+const DPR = Math.min(window.devicePixelRatio || 1, 2); 
 
-// ── 完整文字内容恢复 ─────────────────────────────────────────
+// ── TEXT CONTENT (Keep All) ──────────────────────────────────
 
 const TEXTS_ZH = [
-  '说','听','语','言','我','你','他','间','字','声','口','心','意','思','话','写','读','懂','找','失','名','词','句','译','换','借','混','跨','界','边','沉','默','漂','流','根','土','乡','异','归','离','脑','舌','喉','气','息','音','调','腔','韵','换',
-  '讠','耳','目','手','足','氵','木','人','女','门',
+  '说','听','语','言','我','你','他','间','字','声','口','心','意','思','话','写','读','懂','找','失','名','词','句','译','换','借','混','跨','界','边','沉','默','漂','流','根','土','乡','异','归','离','脑','舌','喉','气','息','音','调','腔','韵','换','讠','耳','目','手','足','氵','木','人','女','门',
+  // Sentences
   '等等…','还是说','怎么说','然后','不对','我不知道怎么翻译','这个词只有中文有','你懂我的意思吗','说不出来','忘词了','在哪一种语言里','我才是我自己','妈妈的语言','学校的语言','梦里的语言','两种语言之间的沉默','有些话只能用这个说','我在两种语言之间长大','翻译不了的感觉','心里想的是中文','说出来变成了别的','语言在喉咙里打架','我用哪种语言哭','我用哪种语言笑','名字被叫错的感觉',
 ];
 
 const TEXTS_FR = [
-  'langue','dire','entre','mots','jamais','parler','voix','perdre','trouver','sens','silence','souffle','frontière','glisser','appartenir','mémoire','accent','traduire','manquer','chercher','habiter','corps','racine','dérive','passage','seuil','identité','nommer','résonner','naviguer',
-  'é','è','ê','à','â','ç','œ','ô','î','ï',
-  'mais…','c\'est quoi','comment dire','et alors','ce n\'est pas ça','je cherche mes mots','tu comprends?','comment expliquer','c\'est différent','dans quelle langue je rêve','je me perds entre les deux','le mot exact n\'existe pas','une langue que j\'habite à moitié','glisser d\'une langue à l\'autre','ma voix change selon la langue','les mots me manquent','je ne suis pas la même personne','quelque chose se perd','quelque chose reste',
+  'langue','dire','entre','mots','jamais','parler','voix','perdre','trouver','sens','silence','souffle','frontière','glisser','appartenir','mémoire','accent','traduire','manquer','chercher','habiter','corps','racine','dérive','passage','seuil','identité','nommer','résonner','naviguer','é','è','ê','à','â','ç','œ','ô','î','ï',
+  // Sentences
+  'mais…','c\'est quoi','comment say','et alors','ce n\'est pas ça','je cherche mes mots','tu comprends?','comment expliquer','c\'est différent','dans quelle langue je rêve','je me perds entre les deux','le mot exact n\'existe pas','une langue que j\'habite à moitié','glisser d\'une langue à l\'autre','ma voix change selon la langue','les mots me manquent','je ne suis pas la même personne','quelque chose se perd','quelque chose reste',
 ];
 
 const TEXTS_EN = [
-  'speak','hear','lost','found','between','word','tongue','slip','drift','gap','silence','breath','border','cross','belong','memory','accent','translate','switch','code','hybrid','fluid','root','echo','trace','hold','inherit','navigate','rupture','carry',
-  '/ə/','/θ/','/tɕ/','/y/','/ʒ/','/ɑ/','/œ/','/ɥ/','/ŋ/','/ʁ/','A','B','Q','Z','X',
+  'speak','hear','lost','found','between','word','tongue','slip','drift','gap','silence','breath','border','cross','belong','memory','accent','translate','switch','code','hybrid','fluid','root','echo','trace','hold','inherit','navigate','rupture','carry','/ə/','/θ/','/tɕ/','/y/','/ʒ/','/ɑ/','/œ/','/ɥ/','/ŋ/','/ʁ/','A','B','Q','Z','X',
+  // Sentences
   'sorry…','I mean','how do I say','and then','that\'s not what I meant','I think better in—','wait, in which language','the word doesn\'t exist in English','I grew up between','lost in translation','which version of me are you talking to','my accent gives me away','I dream in more than one language','something gets lost','something stays','a different self in every language','what doesn\'t translate','neither here nor there','the language I inherited','code-switching in my sleep','the gap between','the in-between',
 ];
 
@@ -93,32 +92,28 @@ const TEXTS_TAGGED = [
 const SERIF_ZH = '"Noto Serif SC", "STSong", "华文宋体", "SimSun", "宋体", serif';
 
 const LANG_CONFIG = {
-  zh: { fonts: [`{s}px ${SERIF_ZH}`, `bold {s}px ${SERIF_ZH}`], colors: ['#e84545','#d63a3a','#f05555','#c93030','#e86060','#bf2a2a','#f07070'] },
-  fr: { fonts: [`italic {s}px "Georgia", serif`, `italic {s}px "Times New Roman", serif`], colors: ['#4a8fd9','#3a7ec8','#5a9fe8','#2d72bb','#6aaee8','#1f5fa0','#7bbcf0'] },
-  en: { fonts: [`{s}px "Courier Prime", monospace`, `bold {s}px "Courier Prime", monospace`], colors: ['#8fcc3b','#7db82e','#9fd948','#6aa022','#aad960','#5a8c18','#b8e655'] },
+  zh: { fonts: [`{s}px ${SERIF_ZH}`, `bold {s}px ${SERIF_ZH}`], colors: ['#e84545','#c93030','#e86060','#f07070'] },
+  fr: { fonts: [`italic {s}px "Georgia", serif`, `italic {s}px "Times New Roman", serif`], colors: ['#4a8fd9','#2d72bb','#5a9fe8'] },
+  en: { fonts: [`{s}px "Courier Prime", monospace`, `bold {s}px "Courier Prime", monospace`], colors: ['#8fcc3b','#7db82e','#9fd948'] },
 };
 
-// ── 动画参数 ───────────────────────────────────────────────
-const N_ELEMENTS  = 180;
+// ── CONFIG ───────────────────────────────────────────────
+const N_ELEMENTS  = 200; // Increase slightly
 const SPREAD      = 12;
-const SPEED       = 0.22;
-const BOB_HZ      = 0.18;
-const BOB_AMT     = 0.10;
-const ROT_MAX     = 0.010;
+const DRIFT_SPEED = 0.22; // Original drift speed
+const SCROLL_SPEED = 0.6; // Speed for sentences
 
 let renderer, scene, camera, clock, meshes = [];
 let dragYaw = 0, dragPitch = 0, pointerDown = false, lastPX = 0, lastPY = 0;
 
-// ── 字体预加载锁 ──────────────────────────────────────────
+// ── Font Preload ──────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
     try {
-        // 关键：强制等待思源宋体加载完成
         await document.fonts.load('12px "Noto Serif SC"');
         document.getElementById('loading-msg').innerHTML = '语言漂浮在我们之间。<br>Language drifts between us.<br>Les langues dérivent entre nous.';
         document.getElementById('start-btn').style.display = 'block';
         document.getElementById('swipe-hint').style.display = 'block';
     } catch(e) {
-        // 如果加载失败（如网络问题），直接显示按钮尝试运行
         document.getElementById('start-btn').style.display = 'block';
     }
 });
@@ -129,24 +124,23 @@ function makeTexture(tagged) {
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d');
 
+  // 判断是否为短句 (原本逻辑)
   const isSentence = text.length > 5;
-  const logicalSize = isSentence ? 22 : 38;
+  const logicalSize = isSentence ? 22 : 38; // 原本字号
   const physSize = Math.round(logicalSize * DPR);
 
   const fontTpl = cfg.fonts[Math.floor(Math.random() * cfg.fonts.length)];
   const font = fontTpl.replace('{s}', physSize);
 
-  // 1. 设置字体测量宽度
   ctx.font = font;
   const metrics = ctx.measureText(text);
   const tw = Math.ceil(metrics.width) + Math.ceil(physSize * 0.6);
   const th = Math.ceil(physSize * 1.6);
 
-  // 2. 这里的宽高赋值会重置 Canvas 状态
   c.width = Math.max(tw, 4);
   c.height = Math.max(th, 4);
 
-  // 3. 必须在设置宽厚之后重新设置状态
+  // Restore state after width change
   ctx.font = font; 
   ctx.fillStyle = cfg.colors[Math.floor(Math.random() * cfg.colors.length)];
   ctx.textAlign = 'center';
@@ -165,7 +159,7 @@ async function start() {
       video:{ facingMode:{ideal:'environment'} }, audio:false
     });
     document.getElementById('cam').srcObject = s;
-  } catch(e) { console.log("Camera failed", e); }
+  } catch(e) {}
 
   const canvas = document.getElementById('three-canvas');
   renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
@@ -174,17 +168,17 @@ async function start() {
 
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0, 6);
+  camera.position.set(0, 0, 7); // Pull back slightly
   clock = new THREE.Clock();
 
-  // 响应式监听
+  // Resize handler
   window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
   });
 
-  // 交互支持（手机触屏）
+  // Touch controls
   const el = renderer.domElement;
   const onDown = e => { pointerDown=true; const p = e.touches ? e.touches[0] : e; lastPX=p.clientX; lastPY=p.clientY; };
   const onMove = e => {
@@ -199,39 +193,87 @@ async function start() {
   window.addEventListener('touchend', () => pointerDown=false);
   window.addEventListener('touchmove', onMove);
 
-  // 生成粒子
+  // Generate elements
   for (let i = 0; i < N_ELEMENTS; i++) {
     const tagged = TEXTS_TAGGED[i % TEXTS_TAGGED.length];
     const { tex, ratio, isSentence } = makeTexture(tagged);
 
-    const sizeVar = isSentence ? 0.9 + Math.random() * 0.8 : 0.4 + Math.random() * 0.9;
-    const w = sizeVar * 1.4;
+    const sizeVar = isSentence ? 1.0 + Math.random() * 0.5 : 0.4 + Math.random() * 0.9;
+    const w = sizeVar * 1.5;
     const h = w * ratio;
 
     const geo = new THREE.PlaneGeometry(w, h);
-    const baseOpacity = 0.55 + Math.random() * 0.45;
-    const mat = new THREE.MeshBasicMaterial({
-      map: tex, transparent:true, depthWrite:false, side: THREE.DoubleSide, opacity: baseOpacity,
-    });
+    
+    // --- 核心修改：材质物理分离 ---
+    let mat;
+    if (isSentence) {
+      // 短句材质：全透明，不随距离变透明
+      mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true, // 仍然需要 transparent:true 来渲染 canvas 的透明背景
+        opacity: 1.0,      // 强制 100% 不透明度
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+    } else {
+      // 单字/词材质：原始漂浮逻辑 (有透明度变化)
+      const baseOpacity = 0.4 + Math.random() * 0.5;
+      mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: baseOpacity,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      // 记录初始透明度用于后续动画
+      geo.userData = { baseOpacity }; 
+    }
+    
     const mesh = new THREE.Mesh(geo, mat);
 
-    mesh.position.set((Math.random()-0.5)*SPREAD*2, (Math.random()-0.5)*SPREAD, (Math.random()-0.5)*SPREAD*1.8);
-    mesh.rotation.set((Math.random()-0.5)*Math.PI, (Math.random()-0.5)*Math.PI, 0);
+    // 初始位置分布
+    mesh.position.set((Math.random()-0.5)*SPREAD*2.5, (Math.random()-0.5)*SPREAD*1.2, (Math.random()-0.5)*SPREAD*1.5);
+    
+    // 旋转逻辑分离
+    if (isSentence) {
+      // 短句基本不旋转，或者保持一个很小的固定角度，更像“显像”
+      mesh.rotation.set(0, (Math.random()-0.5)*0.2, 0);
+    } else {
+      mesh.rotation.set((Math.random()-0.5)*Math.PI, (Math.random()-0.5)*Math.PI, 0);
+    }
 
-    mesh.userData = {
-      vx: (Math.random() > 0.5 ? 1 : -1) * SPEED * (0.4 + Math.random()),
-      vy: (Math.random()-0.5) * SPEED * 0.3,
-      vz: (Math.random()-0.5) * SPEED * 0.2,
-      rx: (Math.random()-0.5) * 2 * ROT_MAX,
-      ry: (Math.random()-0.5) * 2 * ROT_MAX * 1.5,
-      rz: (Math.random()-0.5) * 2 * ROT_MAX * 0.6,
-      bobPhase: Math.random() * Math.PI * 2,
-      bobRate: 0.6 + Math.random() * 0.8,
-      baseY: mesh.position.y,
-      wobblePhase: Math.random() * Math.PI * 2,
-      wobbleAmt: (Math.random()-0.5) * 0.06,
-      baseOpacity,
-    };
+    // --- 核心修改：动画属性分离 ---
+    if (isSentence) {
+      // 短句滚动逻辑数据
+      const moveType = Math.floor(Math.random() * 3); // 0: 水平, 1: 垂直, 2: 斜角
+      let vx = 0, vy = 0;
+      
+      if (moveType === 0) { vx = (Math.random()>0.5?1:-1) * SCROLL_SPEED; }
+      else if (moveType === 1) { vy = (Math.random()>0.5?1:-1) * SCROLL_SPEED * 0.8; }
+      else { 
+        vx = (Math.random()>0.5?1:-1) * SCROLL_SPEED * 0.7; 
+        vy = (Math.random()>0.5?1:-1) * SCROLL_SPEED * 0.5; 
+      }
+
+      mesh.userData = {
+        isSentence: true,
+        vx, vy, vz: 0, // 句子不在 Z 轴深处移动
+      };
+    } else {
+      // 单字/词原始漂浮数据
+      mesh.userData = {
+        isSentence: false,
+        vx: (Math.random() > 0.5 ? 1 : -1) * DRIFT_SPEED * (0.4 + Math.random()),
+        vy: (Math.random()-0.5) * DRIFT_SPEED * 0.3,
+        vz: (Math.random()-0.5) * DRIFT_SPEED * 0.2,
+        rx: (Math.random()-0.5) * 0.01,
+        ry: (Math.random()-0.5) * 0.015,
+        rz: (Math.random()-0.5) * 0.006,
+        bobPhase: Math.random() * Math.PI * 2,
+        baseY: mesh.position.y,
+        baseOpacity: geo.userData.baseOpacity
+      };
+    }
 
     scene.add(mesh);
     meshes.push(mesh);
@@ -244,28 +286,52 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.getElapsedTime();
-  const H = SPREAD;
+  const H_LIMIT = SPREAD * 1.3;
+  const V_LIMIT = SPREAD * 0.8;
+  const Z_LIMIT = SPREAD * 1.0;
 
   meshes.forEach(m => {
     const d = m.userData;
-    const wobble = Math.sin(t * 0.4 + d.wobblePhase) * d.wobbleAmt;
 
-    m.position.x += (d.vx + wobble) * dt;
-    m.position.y = d.baseY + Math.sin(t * BOB_HZ * d.bobRate * Math.PI*2 + d.bobPhase) * BOB_AMT;
-    m.position.z += d.vz * dt;
+    if (d.isSentence) {
+      // --- 短句滚动动画：匀速，不透明 ---
+      m.position.x += d.vx * dt;
+      m.position.y += d.vy * dt;
+      
+      // 边界处理 (无限循环滚动)
+      if (m.position.x > H_LIMIT) m.position.x = -H_LIMIT;
+      if (m.position.x < -H_LIMIT) m.position.x = H_LIMIT;
+      if (m.position.y > V_LIMIT) m.position.y = -V_LIMIT;
+      if (m.position.y < -V_LIMIT) m.position.y = V_LIMIT;
+      
+      // 强制不透明 (不需要随 Z 轴变淡)
+      m.material.opacity = 1.0;
 
-    m.rotation.x += d.rx * dt * 60;
-    m.rotation.y += d.ry * dt * 60;
-    m.rotation.z += d.rz * dt * 60;
+    } else {
+      // --- 单字/词漂浮动画：原始逻辑 ---
+      m.position.x += d.vx * dt;
+      // 叠加轻微呼吸感
+      m.position.y = d.baseY + Math.sin(t * 0.5 + d.bobPhase) * 0.08; 
+      m.position.z += d.vz * dt;
 
-    const lim = H * 2;
-    if (m.position.x > lim) m.position.x = -lim;
-    if (m.position.x < -lim) m.position.x = lim;
+      // 自转
+      m.rotation.x += d.rx;
+      m.rotation.y += d.ry;
+      m.rotation.z += d.rz;
 
-    const depth = (m.position.z + H*1.5) / (H*3.0);
-    m.material.opacity = Math.max(0.1, Math.min(0.9, d.baseOpacity * (0.3 + depth * 0.7)));
+      // 边界处理
+      if (m.position.x > H_LIMIT) m.position.x = -H_LIMIT;
+      if (m.position.x < -H_LIMIT) m.position.x = H_LIMIT;
+      if (m.position.z > Z_LIMIT) m.position.z = -Z_LIMIT;
+      if (m.position.z < -Z_LIMIT) m.position.z = Z_LIMIT;
+
+      // 原始景深透明度变化
+      const depthOpacity = (m.position.z + Z_LIMIT) / (Z_LIMIT * 2.0);
+      m.material.opacity = Math.max(0.1, Math.min(0.8, d.baseOpacity * (0.3 + depthOpacity * 0.7)));
+    }
   });
 
+  // 陀螺仪效果保持
   camera.rotation.y += (dragYaw - camera.rotation.y) * 0.08;
   camera.rotation.x += (dragPitch - camera.rotation.x) * 0.08;
 
