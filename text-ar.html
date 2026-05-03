@@ -4,12 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Between Tongues</title>
+
+<!-- 字体预加载 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
 #cam { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
 #three-canvas { position:fixed; inset:0; z-index:1; }
-
 
 #ui {
   position:fixed; inset:0; z-index:20;
@@ -19,12 +24,12 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
   text-align:center; padding:48px; gap:10px;
 }
 
-
 #ui .sub { font-size:10px; color:#444; letter-spacing:0.22em; }
 #ui h1   { font-size:16px; font-weight:normal; }
 #ui p    { font-size:11px; color:#666; line-height:1.85; max-width:300px; }
 #ui button {
-  margin-top:20px; padding:13px 44px; background: linear-gradient(135deg, #E8503A 0%, #4A9EBF 50%, #8BBF3A 100%);
+  margin-top:20px; padding:13px 44px;
+  background: linear-gradient(135deg, #E8503A 0%, #4A9EBF 50%, #8BBF3A 100%);
   color:#fff; border:none; font-family:monospace;
   font-size:14px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
 }
@@ -35,8 +40,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
 <canvas id="three-canvas"></canvas>
 
 <div id="ui">
-  
-  <h1 style="font-size:32px; font-family:'Times New Roman', Times, serif;font-weight:500; letter-spacing:-0.01em; color:#111; line-height:1.3;">
+  <h1 style="font-size:32px; font-family:'Times New Roman', Times, serif; font-weight:500; letter-spacing:-0.01em; color:#111; line-height:1.3;">
     Lost and Found Between One Word and the Next
   </h1>
 
@@ -64,61 +68,88 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+
+// ── DEVICE PIXEL RATIO ──────────────────────────────────
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+
 // ── TEXT CONTENT ─────────────────────────────────────────
-const TEXTS = [
-  // 单个中文字
+// 中文
+const TEXTS_ZH = [
   '说','听','语','言','我','你','他','间','字','声',
   '口','心','意','思','话','写','读','懂','找','失',
   '名','词','句','译','换','借','混','跨','界','边',
-  // 偏旁部首
-  '讠','口','耳','心','目','手','足','阝','氵','木',
-  '人','女','子','门','言','页','纟','艹','钅','风',
-  // 法语词
+  '讠','耳','目','手','足','阝','氵','木',
+  '人','女','子','门','言','页','纟','艹',
+  '等等…','还是说','怎么说','然后','不对',
+];
+
+// 法语
+const TEXTS_FR = [
   'langue','dire','entre','mots','jamais',
   'parler','voix','perdre','trouver','sens',
   'silence','souffle','frontière','glisser',
-  // 英语词
+  'mais…','c\'est quoi','comment dire',
+  'et alors','ce n\'est pas',
+  'é','è','ê','ë','à','â','ç','œ','ô','î',
+];
+
+// 英语
+const TEXTS_EN = [
   'speak','hear','lost','found','between',
   'word','tongue','slip','drift','gap',
   'silence','breath','border','cross',
-  // 音标
+  'sorry…','I mean','how do I','and then','that\'s not',
   '/ə/','/θ/','/tɕ/','/y/','/ʒ/',
   '/ɑ/','/œ/','/ɥ/','/ŋ/','/ʁ/',
-  // 字母/符号散落
-  'é','è','ü','ñ','ç','ô','â','î',
   'A','B','C','Q','Z','X',
-  // 短句/片段
-  '等等…','mais…','sorry…',
-  'I mean','c\'est quoi','还是说',
-  '怎么说','comment dire','how do I',
-  '然后','et alors','and then',
-  '不对','ce n\'est pas','that\'s not',
 ];
+
+// 合并时保留语言标记，用于正确分配字体和颜色
+const TEXTS_TAGGED = [
+  ...TEXTS_ZH.map(t => ({ text: t, lang: 'zh' })),
+  ...TEXTS_FR.map(t => ({ text: t, lang: 'fr' })),
+  ...TEXTS_EN.map(t => ({ text: t, lang: 'en' })),
+];
+
+// ── LANGUAGE CONFIG ──────────────────────────────────────
+// 中文：珊瑚红系，思源宋体
+// 法语：蓝色系，Georgia Italic（Times Roman风格）
+// 英语：绿色系，Courier Prime
+const LANG_CONFIG = {
+  zh: {
+    fonts: [
+      `{s}px "Noto Serif SC", "SimSun", serif`,
+      `bold {s}px "Noto Serif SC", serif`,
+      `{s}px "Noto Serif SC", serif`,
+    ],
+    colors: ['#e84545','#d63a3a','#f05555','#c93030','#e86060','#bf2a2a','#f07070'],
+  },
+  fr: {
+    fonts: [
+      `italic {s}px "Georgia", "Times New Roman", serif`,
+      `italic bold {s}px "Georgia", serif`,
+      `italic {s}px "Times New Roman", serif`,
+    ],
+    colors: ['#4a8fd9','#3a7ec8','#5a9fe8','#2d72bb','#6aaee8','#1f5fa0','#7bbcf0'],
+  },
+  en: {
+    fonts: [
+      `{s}px "Courier Prime", "Courier New", monospace`,
+      `bold {s}px "Courier Prime", monospace`,
+      `italic {s}px "Courier Prime", monospace`,
+      `bold italic {s}px "Courier Prime", monospace`,
+    ],
+    colors: ['#8fcc3b','#7db82e','#9fd948','#6aa022','#aad960','#5a8c18','#b8e655'],
+  },
+};
 
 // ── CONFIG ───────────────────────────────────────────────
-const N_ELEMENTS  = 120;   // total floating elements
-const SPREAD      = 12;    // world space radius
-const SPEED       = 0.22;  // drift speed
+const N_ELEMENTS  = 120;
+const SPREAD      = 12;
+const SPEED       = 0.22;
 const BOB_HZ      = 0.18;
 const BOB_AMT     = 0.10;
-const ROT_MAX     = 0.010; // gentle tumble
-
-// Color palette — coral / sky / lime / dark / mid
-const COLORS = [
-  '#E8503A','#E8503A','#E8503A',   // coral (weighted)
-  '#4A9EBF','#4A9EBF','#4A9EBF',   // sky
-  '#8BBF3A','#8BBF3A',             // lime
-  '#111111','#111111','#333333',   // dark (most common)
-  '#888888',                       // grey
-];
-
-const FONTS = [
-  { f:'bold {s}px serif',       w:1 },
-  { f:'italic {s}px serif',     w:1 },
-  { f:'{s}px monospace',        w:1 },
-  { f:'bold italic {s}px serif',w:0.5 },
-  { f:'{s}px sans-serif',       w:0.5 },
-];
+const ROT_MAX     = 0.010;
 
 // ── STATE ────────────────────────────────────────────────
 let renderer, scene, camera, clock;
@@ -127,29 +158,34 @@ let dragYaw = 0, dragPitch = 0;
 let pointerDown = false, lastPX = 0, lastPY = 0;
 
 // ── MAKE TEXT TEXTURE ────────────────────────────────────
-function makeTexture(text) {
+// 修复：canvas以物理像素(DPR×)渲染，解决Retina模糊问题
+function makeTexture(tagged) {
+  const { text, lang } = tagged;
+  const cfg = LANG_CONFIG[lang];
+
   const c   = document.createElement('canvas');
   const ctx = c.getContext('2d');
 
-  // pick font
-  const fDef = FONTS[Math.floor(Math.random() * FONTS.length)];
-  const size = 48 + Math.floor(Math.random() * 72); // 48–120px
-  const font = fDef.f.replace('{s}', size);
+  // 逻辑字号 → 物理字号（乘DPR）
+  const logicalSize = 28 + Math.floor(Math.random() * 48);
+  const physSize    = Math.round(logicalSize * DPR);
+
+  const fontTpl = cfg.fonts[Math.floor(Math.random() * cfg.fonts.length)];
+  const font    = fontTpl.replace('{s}', physSize);
+  const color   = cfg.colors[Math.floor(Math.random() * cfg.colors.length)];
 
   ctx.font = font;
   const metrics = ctx.measureText(text);
-  const tw = Math.ceil(metrics.width) + 24;
-  const th = Math.ceil(size * 1.4);
+  const tw = Math.ceil(metrics.width) + Math.ceil(physSize * 0.6);
+  const th = Math.ceil(physSize * 1.6);
 
-  c.width  = Math.max(tw, 2);
-  c.height = Math.max(th, 2);
+  c.width  = Math.max(tw, 4);
+  c.height = Math.max(th, 4);
 
-  // transparent background
+  // resize后必须重新设置font
   ctx.clearRect(0, 0, c.width, c.height);
-
-  // color
-  ctx.font      = font;
-  ctx.fillStyle = COLORS[Math.floor(Math.random() * COLORS.length)];
+  ctx.font         = font;
+  ctx.fillStyle    = color;
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, c.width / 2, c.height / 2);
@@ -157,7 +193,9 @@ function makeTexture(text) {
   const tex = new THREE.CanvasTexture(c);
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  return { tex, ratio: c.height / c.width, text };
+
+  // ratio基于物理canvas，PlaneGeometry用逻辑尺寸
+  return { tex, ratio: c.height / c.width };
 }
 
 // ── START ────────────────────────────────────────────────
@@ -179,7 +217,7 @@ async function start() {
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, isAndroid ? 1.5 : 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000, 0); // warm white bg — no camera needed
+  renderer.setClearColor(0x000000, 0);
 
   scene  = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
@@ -205,13 +243,16 @@ async function start() {
     lastPX = e.clientX; lastPY = e.clientY;
   });
 
+  // 等字体加载完再spawn，防止中文fallback到系统字体
+  await document.fonts.ready;
+
   // spawn elements
   for (let i = 0; i < N_ELEMENTS; i++) {
-    const text = TEXTS[i % TEXTS.length];
-    const { tex, ratio } = makeTexture(text);
+    const tagged = TEXTS_TAGGED[i % TEXTS_TAGGED.length];
+    const { tex, ratio } = makeTexture(tagged);
 
     const sizeVar = 0.5 + Math.random() * 1.0;
-    const w = sizeVar * 1.4;
+    const w = sizeVar * 1.4;   // 逻辑世界单位，不乘DPR
     const h = w * ratio;
 
     const geo = new THREE.PlaneGeometry(w, h);
@@ -223,21 +264,18 @@ async function start() {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.renderOrder = Math.random();
 
-    // position
     mesh.position.set(
       (Math.random()-0.5) * SPREAD * 2,
       (Math.random()-0.5) * SPREAD,
       (Math.random()-0.5) * SPREAD * 1.8
     );
 
-    // initial tilt — not all facing camera
     mesh.rotation.set(
       (Math.random()-0.5) * Math.PI * 0.5,
       (Math.random()-0.5) * Math.PI * 0.7,
       (Math.random()-0.5) * Math.PI * 0.3
     );
 
-    // drift
     const angle = Math.random() * Math.PI * 2;
     const spd   = SPEED * (0.4 + Math.random() * 0.9);
     const baseOpacity = 0.55 + Math.random() * 0.45;
