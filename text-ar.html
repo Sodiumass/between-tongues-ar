@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Between Tongues</title>
 
-<!-- 字体预加载 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -24,9 +23,6 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
   text-align:center; padding:48px; gap:10px;
 }
 
-#ui .sub { font-size:10px; color:#444; letter-spacing:0.22em; }
-#ui h1   { font-size:16px; font-weight:normal; }
-#ui p    { font-size:11px; color:#666; line-height:1.85; max-width:300px; }
 #ui button {
   margin-top:20px; padding:13px 44px;
   background: linear-gradient(135deg, #E8503A 0%, #4A9EBF 50%, #8BBF3A 100%);
@@ -43,68 +39,112 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
   <h1 style="font-size:32px; font-family:'Times New Roman', Times, serif; font-weight:500; letter-spacing:-0.01em; color:#111; line-height:1.3;">
     Lost and Found Between One Word and the Next
   </h1>
-
   <div style="font-size:16px; font-style:italic; color:#888; margin-top:2px; line-height:1.5;">
     Making Translanguaging Visible as Embodied Design Practice
   </div>
-
   <div style="width:32px; height:1px; background:#ccc; margin:16px auto;"></div>
-
   <div style="font-size:14px; color:#555; line-height:1.9; max-width:300px;">
     语言漂浮在我们之间。<br>
     Language drifts between us.<br>
     Les langues dérivent entre nous.
   </div>
-
   <div style="width:32px; height:1px; background:#ccc; margin:16px auto;"></div>
-
   <div style="font-size:16px; letter-spacing:0.18em; text-transform:uppercase; color:#656565; margin-top:8px;">
     Swipe to explore different angles
   </div>
-
   <button onclick="start()">Enter</button>
 </div>
-
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 
-// ── DEVICE PIXEL RATIO ──────────────────────────────────
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
 // ── TEXT CONTENT ─────────────────────────────────────────
-// 中文
+
 const TEXTS_ZH = [
+  // 单字
   '说','听','语','言','我','你','他','间','字','声',
   '口','心','意','思','话','写','读','懂','找','失',
   '名','词','句','译','换','借','混','跨','界','边',
-  '讠','耳','目','手','足','阝','氵','木',
-  '人','女','子','门','言','页','纟','艹',
+  '沉','默','漂','流','根','土','乡','异','归','离',
+  '脑','舌','喉','气','息','音','调','腔','韵','换',
+  // 偏旁
+  '讠','耳','目','手','足','氵','木','人','女','门',
+  // 内心独白 / 语言切换瞬间
   '等等…','还是说','怎么说','然后','不对',
+  '我不知道怎么翻译','这个词只有中文有',
+  '你懂我的意思吗','说不出来','忘词了',
+  '在哪一种语言里','我才是我自己',
+  '妈妈的语言','学校的语言','梦里的语言',
+  '两种语言之间的沉默','有些话只能用这个说',
+  '我在两种语言之间长大',
+  '翻译不了的感觉','心里想的是中文',
+  '说出来变成了别的','语言在喉咙里打架',
+  '我用哪种语言哭','我用哪种语言笑',
+  '名字被叫错的感觉',
 ];
 
-// 法语
 const TEXTS_FR = [
+  // 单词
   'langue','dire','entre','mots','jamais',
   'parler','voix','perdre','trouver','sens',
   'silence','souffle','frontière','glisser',
+  'appartenir','mémoire','accent','traduire',
+  'manquer','chercher','habiter','corps',
+  'racine','dérive','passage','seuil',
+  'identité','nommer','résonner','naviguer',
+  // 音标/字符
+  'é','è','ê','à','â','ç','œ','ô','î','ï',
+  // 对话碎片 / 犹豫瞬间
   'mais…','c\'est quoi','comment dire',
-  'et alors','ce n\'est pas',
-  'é','è','ê','ë','à','â','ç','œ','ô','î',
+  'et alors','ce n\'est pas ça',
+  'je cherche mes mots','tu comprends?',
+  'comment expliquer','c\'est différent',
+  'dans quelle langue je rêve',
+  'je me perds entre les deux',
+  'le mot exact n\'existe pas',
+  'une langue que j\'habite à moitié',
+  'glisser d\'une langue à l\'autre',
+  'ma voix change selon la langue',
+  'les mots me manquent',
+  'je ne suis pas la même personne',
+  'quelque chose se perd','quelque chose reste',
 ];
 
-// 英语
 const TEXTS_EN = [
+  // 单词
   'speak','hear','lost','found','between',
   'word','tongue','slip','drift','gap',
   'silence','breath','border','cross',
-  'sorry…','I mean','how do I','and then','that\'s not',
+  'belong','memory','accent','translate',
+  'switch','code','hybrid','fluid',
+  'root','echo','trace','hold',
+  'inherit','navigate','rupture','carry',
+  // 音标
   '/ə/','/θ/','/tɕ/','/y/','/ʒ/',
   '/ɑ/','/œ/','/ɥ/','/ŋ/','/ʁ/',
-  'A','B','C','Q','Z','X',
+  // 字母散落
+  'A','B','Q','Z','X',
+  // 短句 — translanguaging / 身份碎片
+  'sorry…','I mean','how do I say',
+  'and then','that\'s not what I meant',
+  'I think better in—','wait, in which language',
+  'the word doesn\'t exist in English',
+  'I grew up between','lost in translation',
+  'which version of me are you talking to',
+  'my accent gives me away',
+  'I dream in more than one language',
+  'something gets lost','something stays',
+  'a different self in every language',
+  'what doesn\'t translate',
+  'neither here nor there',
+  'the language I inherited',
+  'code-switching in my sleep',
+  'the gap between','the in-between',
 ];
 
-// 合并时保留语言标记，用于正确分配字体和颜色
+// 合并，带语言标记
 const TEXTS_TAGGED = [
   ...TEXTS_ZH.map(t => ({ text: t, lang: 'zh' })),
   ...TEXTS_FR.map(t => ({ text: t, lang: 'fr' })),
@@ -112,15 +152,16 @@ const TEXTS_TAGGED = [
 ];
 
 // ── LANGUAGE CONFIG ──────────────────────────────────────
-// 中文：珊瑚红系，思源宋体
-// 法语：蓝色系，Georgia Italic（Times Roman风格）
-// 英语：绿色系，Courier Prime
+// 中文宋体fallback链：Noto Serif SC(Google) → STSong(Mac/iOS) → SimSun(Win) → 宋体 → serif
+// 关键：不能出现黑体/无衬线体。如果Noto Serif SC没加载到，
+// STSong和SimSun都是宋体，能正确渲染衬线。
+const SERIF_ZH = '"Noto Serif SC", "STSong", "华文宋体", "SimSun", "宋体", serif';
+
 const LANG_CONFIG = {
   zh: {
     fonts: [
-      `{s}px "Noto Serif SC", "SimSun", serif`,
-      `bold {s}px "Noto Serif SC", serif`,
-      `{s}px "Noto Serif SC", serif`,
+      `{s}px ${SERIF_ZH}`,
+      `bold {s}px ${SERIF_ZH}`,
     ],
     colors: ['#e84545','#d63a3a','#f05555','#c93030','#e86060','#bf2a2a','#f07070'],
   },
@@ -144,7 +185,7 @@ const LANG_CONFIG = {
 };
 
 // ── CONFIG ───────────────────────────────────────────────
-const N_ELEMENTS  = 120;
+const N_ELEMENTS  = 180;
 const SPREAD      = 12;
 const SPEED       = 0.22;
 const BOB_HZ      = 0.18;
@@ -158,7 +199,6 @@ let dragYaw = 0, dragPitch = 0;
 let pointerDown = false, lastPX = 0, lastPY = 0;
 
 // ── MAKE TEXT TEXTURE ────────────────────────────────────
-// 修复：canvas以物理像素(DPR×)渲染，解决Retina模糊问题
 function makeTexture(tagged) {
   const { text, lang } = tagged;
   const cfg = LANG_CONFIG[lang];
@@ -166,9 +206,12 @@ function makeTexture(tagged) {
   const c   = document.createElement('canvas');
   const ctx = c.getContext('2d');
 
-  // 逻辑字号 → 物理字号（乘DPR）
-  const logicalSize = 28 + Math.floor(Math.random() * 48);
-  const physSize    = Math.round(logicalSize * DPR);
+  // 短句字号小一点，单字/音标大一点
+  const isSentence = text.length > 5;
+  const minSize = isSentence ? 18 : 28;
+  const maxSize = isSentence ? 32 : 52;
+  const logicalSize = minSize + Math.floor(Math.random() * (maxSize - minSize));
+  const physSize    = Math.round(logicalSize * DPR); // 物理像素，解决Retina模糊
 
   const fontTpl = cfg.fonts[Math.floor(Math.random() * cfg.fonts.length)];
   const font    = fontTpl.replace('{s}', physSize);
@@ -182,7 +225,7 @@ function makeTexture(tagged) {
   c.width  = Math.max(tw, 4);
   c.height = Math.max(th, 4);
 
-  // resize后必须重新设置font
+  // canvas resize后必须重设font，否则会用默认font重画
   ctx.clearRect(0, 0, c.width, c.height);
   ctx.font         = font;
   ctx.fillStyle    = color;
@@ -194,8 +237,7 @@ function makeTexture(tagged) {
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
 
-  // ratio基于物理canvas，PlaneGeometry用逻辑尺寸
-  return { tex, ratio: c.height / c.width };
+  return { tex, ratio: c.height / c.width, isSentence };
 }
 
 // ── START ────────────────────────────────────────────────
@@ -230,7 +272,6 @@ async function start() {
     camera.updateProjectionMatrix();
   });
 
-  // drag
   const el = renderer.domElement;
   el.addEventListener('pointerdown', e => { pointerDown=true; lastPX=e.clientX; lastPY=e.clientY; });
   window.addEventListener('pointerup',     () => pointerDown=false);
@@ -243,23 +284,39 @@ async function start() {
     lastPX = e.clientX; lastPY = e.clientY;
   });
 
-  // 等字体加载完再spawn，防止中文fallback到系统字体
+  // 等字体加载完再spawn
   await document.fonts.ready;
 
-  // spawn elements
+  // 检测Noto Serif SC是否真的加载成功
+  // 未加载成功时去掉它，让fallback走STSong/SimSun（都是宋体，不是黑体）
+  let notoLoaded = false;
+  try { notoLoaded = document.fonts.check('400 12px "Noto Serif SC"'); } catch(e) {}
+
+  if (!notoLoaded) {
+    LANG_CONFIG.zh.fonts = [
+      `{s}px "STSong", "华文宋体", "SimSun", "宋体", serif`,
+      `bold {s}px "STSong", "SimSun", "宋体", serif`,
+    ];
+  }
+
+  // spawn
   for (let i = 0; i < N_ELEMENTS; i++) {
     const tagged = TEXTS_TAGGED[i % TEXTS_TAGGED.length];
-    const { tex, ratio } = makeTexture(tagged);
+    const { tex, ratio, isSentence } = makeTexture(tagged);
 
-    const sizeVar = 0.5 + Math.random() * 1.0;
-    const w = sizeVar * 1.4;   // 逻辑世界单位，不乘DPR
+    // 短句给更宽的平面
+    const sizeVar = isSentence
+      ? 0.9 + Math.random() * 0.8
+      : 0.4 + Math.random() * 0.9;
+    const w = sizeVar * 1.4;
     const h = w * ratio;
 
     const geo = new THREE.PlaneGeometry(w, h);
+    const baseOpacity = 0.55 + Math.random() * 0.45;
     const mat = new THREE.MeshBasicMaterial({
       map: tex, transparent:true, depthWrite:false,
       side: THREE.DoubleSide,
-      opacity: 0.55 + Math.random() * 0.45,
+      opacity: baseOpacity,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.renderOrder = Math.random();
@@ -269,7 +326,6 @@ async function start() {
       (Math.random()-0.5) * SPREAD,
       (Math.random()-0.5) * SPREAD * 1.8
     );
-
     mesh.rotation.set(
       (Math.random()-0.5) * Math.PI * 0.5,
       (Math.random()-0.5) * Math.PI * 0.7,
@@ -278,7 +334,6 @@ async function start() {
 
     const angle = Math.random() * Math.PI * 2;
     const spd   = SPEED * (0.4 + Math.random() * 0.9);
-    const baseOpacity = 0.55 + Math.random() * 0.45;
 
     mesh.userData = {
       vx: Math.cos(angle) * spd,
@@ -294,7 +349,6 @@ async function start() {
       wobbleAmt:   (Math.random()-0.5) * 0.06,
       baseOpacity,
     };
-    mat.opacity = baseOpacity;
 
     scene.add(mesh);
     meshes.push(mesh);
