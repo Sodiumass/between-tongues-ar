@@ -193,28 +193,32 @@ function initInput() {
 
 // ═══════════════════════════════════════════════════════
 // STRIP SYSTEM
-// Each strip = exactly ONE scrolling line of text.
-// 'h' strips scroll horizontally (left→right or right→left).
-// 'v' strips scroll vertically   (top→bottom or bottom→top).
-// Sentences are joined into one long repeating ticker string.
+// Three strip types:
+//   'h'  — horizontal ticker, sentences scroll left or right
+//   'vr' — vertical rotated, text rotated 90°, scrolls bottom→top
 // ═══════════════════════════════════════════════════════
 
 let sc, sctx;
 const strips = [];
 
-const GRAYS = ['#1c1c1c','#303030','#444','#585858','#6c6c6c','#808080','#939393'];
+// Darker grays so they read against a busy AR background
+const GRAYS = ['#111','#1a1a1a','#242424','#2e2e2e','#383838','#444','#505050','#5c5c5c'];
 
 function rnd(a,b){ return a + Math.random()*(b-a); }
 function randItem(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
-// Build one long looping sentence string for a strip
-function buildTickerItems(sentences, count) {
+function slicePool(pool, cursor, n) {
   const out = [];
-  for (let i = 0; i < count; i++) {
-    out.push(sentences[i % sentences.length]);
-  }
-  // duplicate so we can loop seamlessly
-  return [...out, ...out];
+  for (let i = 0; i < n; i++) out.push(pool[(cursor+i) % pool.length]);
+  return out;
+}
+
+function measureItems(items, fontFn, fontSize, sep) {
+  const tmp = document.createElement('canvas').getContext('2d');
+  return items.map(item => {
+    tmp.font = fontFn(fontSize);
+    return tmp.measureText(item.text).width + sep;
+  });
 }
 
 function initStrips() {
@@ -225,114 +229,100 @@ function initStrips() {
   const W = window.innerWidth;
   const H = window.innerHeight;
 
-  // All sentences flat, shuffled
   const allSents = [
     ...SENTENCES_ZH.map(t=>({text:t,lang:'zh'})),
     ...SENTENCES_FR.map(t=>({text:t,lang:'fr'})),
     ...SENTENCES_EN.map(t=>({text:t,lang:'en'})),
   ].sort(()=>Math.random()-0.5);
 
-  // Helper: pick n items starting at offset idx
-  function slice(arr, idx, n) {
-    const out = [];
-    for (let i = 0; i < n; i++) out.push(arr[(idx+i) % arr.length]);
-    return out;
-  }
+  let cur = 0;
 
-  let cursor = 0; // rotating index into allSents
-
-  // ── HORIZONTAL STRIPS ─────────────────────────────────
-  // Each is a single line at a fixed Y, sentences separated by wide gaps
-  // fontSize varies per strip; position spread across full height
+  // ── HORIZONTAL strips ──────────────────────────────
+  // spread at different heights, some reversed
   const H_DEFS = [
-    { yFrac:0.07,  fontSize:11, opacity:rnd(0.15,0.28), speedPx: 18, dir:1  },
-    { yFrac:0.19,  fontSize:13, opacity:rnd(0.20,0.35), speedPx: 24, dir:-1 },
-    { yFrac:0.38,  fontSize:10, opacity:rnd(0.12,0.22), speedPx: 14, dir:1  },
-    { yFrac:0.55,  fontSize:14, opacity:rnd(0.18,0.30), speedPx: 20, dir:-1 },
-    { yFrac:0.70,  fontSize:11, opacity:rnd(0.14,0.25), speedPx: 28, dir:1  },
-    { yFrac:0.84,  fontSize:12, opacity:rnd(0.16,0.28), speedPx: 16, dir:-1 },
-    { yFrac:0.95,  fontSize:10, opacity:rnd(0.10,0.20), speedPx: 22, dir:1  },
+    { yFrac:0.06,  fontSize:11, opacity:rnd(0.40,0.55), speedPx:18,  sign: 1  },
+    { yFrac:0.18,  fontSize:13, opacity:rnd(0.45,0.60), speedPx:24,  sign:-1  },
+    { yFrac:0.35,  fontSize:10, opacity:rnd(0.35,0.50), speedPx:14,  sign: 1  },
+    { yFrac:0.52,  fontSize:14, opacity:rnd(0.42,0.58), speedPx:20,  sign:-1  },
+    { yFrac:0.68,  fontSize:11, opacity:rnd(0.38,0.52), speedPx:28,  sign: 1  },
+    { yFrac:0.82,  fontSize:12, opacity:rnd(0.40,0.55), speedPx:16,  sign:-1  },
+    { yFrac:0.94,  fontSize:10, opacity:rnd(0.32,0.48), speedPx:22,  sign: 1  },
   ];
 
   H_DEFS.forEach(def => {
-    const n = 10;
-    const items = slice(allSents, cursor, n);
-    cursor = (cursor + n) % allSents.length;
-    const looped = [...items, ...items]; // seamless loop
-
-    // pre-measure widths at this fontSize using a temp canvas
-    const tmpCtx = document.createElement('canvas').getContext('2d');
-    // use first item's lang for font; items may be mixed lang
-    const lang = items[0].lang;
-    tmpCtx.font = LANG_CONFIG[lang].stripFont(def.fontSize);
-    const SEP = def.fontSize * 4; // wide gap between sentences
-    const itemWidths = looped.map(item => {
-      tmpCtx.font = LANG_CONFIG[item.lang].stripFont(def.fontSize);
-      return tmpCtx.measureText(item.text).width + SEP;
+    const items  = slicePool(allSents, cur, 10);
+    cur = (cur + 10) % allSents.length;
+    const looped = [...items, ...items];
+    const SEP    = def.fontSize * 4;
+    const lang   = items[0].lang;
+    const widths = looped.map(item => {
+      const tmp = document.createElement('canvas').getContext('2d');
+      tmp.font  = LANG_CONFIG[item.lang].stripFont(def.fontSize);
+      return tmp.measureText(item.text).width + SEP;
     });
-    const totalW = itemWidths.reduce((a,b)=>a+b, 0);
+    const totalW = widths.reduce((a,b)=>a+b, 0);
 
     strips.push({
-      dir: 'h',
+      type: 'h',
       y: def.yFrac * H,
       fontSize: def.fontSize,
-      opacity: def.opacity,
-      speedPx: def.speedPx,
-      sign: def.dir,       // 1 = left→right, -1 = right→left
-      looped,
-      itemWidths,
-      totalW,
-      offsetPx: rnd(0, totalW * 0.5), // random start phase
-      // parallax coefficients
-      pxc: rnd(0.03, 0.09) * randItem([-1,1]),
-      pyc: rnd(0.02, 0.06) * randItem([-1,1]),
+      opacity:  def.opacity,
+      speedPx:  def.speedPx,
+      sign:     def.sign,
+      looped, widths, totalW,
+      offsetPx: rnd(0, totalW * 0.5),
+      pxc: rnd(0.03,0.09) * randItem([-1,1]),
+      pyc: rnd(0.02,0.06) * randItem([-1,1]),
     });
   });
 
-  // ── VERTICAL STRIPS ───────────────────────────────────
-  // Each is a single column at a fixed X, sentences stacked with big gaps
-  const V_DEFS = [
-    { xFrac:0.03,  fontSize:11, opacity:rnd(0.14,0.26), speedPx:20, dir:1  },
-    { xFrac:0.12,  fontSize:13, opacity:rnd(0.18,0.32), speedPx:16, dir:-1 },
-    { xFrac:0.88,  fontSize:10, opacity:rnd(0.12,0.22), speedPx:26, dir:1  },
-    { xFrac:0.97,  fontSize:12, opacity:rnd(0.16,0.28), speedPx:18, dir:-1 },
+  // ── VERTICAL ROTATED strips ────────────────────────
+  // Text is rotated 90° (reads left→right when rotated),
+  // scrolled from bottom to top along a fixed X column.
+  // xFrac positions — spread across width, avoiding dead center
+  const VR_DEFS = [
+    { xFrac:0.04,  fontSize:11, opacity:rnd(0.40,0.55), speedPx:22  },
+    { xFrac:0.14,  fontSize:13, opacity:rnd(0.45,0.60), speedPx:16  },
+    { xFrac:0.26,  fontSize:10, opacity:rnd(0.35,0.50), speedPx:28  },
+    { xFrac:0.74,  fontSize:12, opacity:rnd(0.38,0.52), speedPx:20  },
+    { xFrac:0.86,  fontSize:11, opacity:rnd(0.40,0.55), speedPx:18  },
+    { xFrac:0.96,  fontSize:13, opacity:rnd(0.42,0.58), speedPx:24  },
   ];
 
-  V_DEFS.forEach(def => {
-    const n = 8;
-    const items = slice(allSents, cursor, n);
-    cursor = (cursor + n) % allSents.length;
+  VR_DEFS.forEach(def => {
+    const items  = slicePool(allSents, cur, 8);
+    cur = (cur + 8) % allSents.length;
     const looped = [...items, ...items];
-
-    const SEP = def.fontSize * 5;
-    // For vertical strips, each item occupies (textHeight + SEP) px
-    const itemHeights = looped.map(() => def.fontSize + SEP);
-    const totalH = itemHeights.reduce((a,b)=>a+b, 0);
+    // When rotated 90°, each item's "height on screen" = its text width + sep
+    // We measure text width to know spacing along the vertical axis
+    const SEP = def.fontSize * 4;
+    const heights = looped.map(item => {
+      const tmp = document.createElement('canvas').getContext('2d');
+      tmp.font  = LANG_CONFIG[item.lang].stripFont(def.fontSize);
+      return tmp.measureText(item.text).width + SEP;
+    });
+    const totalH = heights.reduce((a,b)=>a+b, 0);
 
     strips.push({
-      dir: 'v',
+      type: 'vr',
       x: def.xFrac * W,
       fontSize: def.fontSize,
-      opacity: def.opacity,
-      speedPx: def.speedPx,
-      sign: def.dir,        // 1 = top→bottom, -1 = bottom→top
-      looped,
-      itemHeights,
-      totalH,
+      opacity:  def.opacity,
+      speedPx:  def.speedPx,
+      sign:     -1,            // always bottom→top
+      looped, heights, totalH,
       offsetPx: rnd(0, totalH * 0.5),
-      pxc: rnd(0.03, 0.08) * randItem([-1,1]),
-      pyc: rnd(0.02, 0.07) * randItem([-1,1]),
+      pxc: rnd(0.02,0.07) * randItem([-1,1]),
+      pyc: rnd(0.02,0.06) * randItem([-1,1]),
     });
   });
 }
 
 function resizeSC() {
-  // Set physical pixel size
   sc.width  = window.innerWidth  * DPR;
   sc.height = window.innerHeight * DPR;
   sc.style.width  = window.innerWidth  + 'px';
   sc.style.height = window.innerHeight + 'px';
-  // Do NOT call sctx.scale here — we apply it fresh each frame
 }
 
 function hexToRgb(hex) {
@@ -343,8 +333,7 @@ function drawStrips(dt) {
   const W = window.innerWidth;
   const H = window.innerHeight;
 
-  // ── KEY FIX: reset transform fully before scaling ──
-  // This prevents the scale from accumulating each frame.
+  // Absolute transform — never accumulates
   sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   sctx.clearRect(0, 0, W, H);
 
@@ -352,64 +341,84 @@ function drawStrips(dt) {
   const camY = dragPitch * H * 0.12;
 
   strips.forEach(s => {
-    // Advance offset in px this frame
-    s.offsetPx += s.speedPx * s.sign * dt;
-    // Wrap
-    if (s.dir === 'h') {
-      if (s.offsetPx >  s.totalW) s.offsetPx -= s.totalW;
-      if (s.offsetPx < -s.totalW) s.offsetPx += s.totalW;
-    } else {
-      if (s.offsetPx >  s.totalH) s.offsetPx -= s.totalH;
-      if (s.offsetPx < -s.totalH) s.offsetPx += s.totalH;
-    }
-
-    const [r,g,b] = hexToRgb(randItem(GRAYS));
     const px = camX * s.pxc;
     const py = camY * s.pyc;
+    const [r,g,b] = hexToRgb(randItem(GRAYS));
 
-    sctx.textBaseline = 'middle';
+    if (s.type === 'h') {
+      // ── horizontal ──────────────────────────────
+      s.offsetPx += s.speedPx * s.sign * dt;
+      if (s.offsetPx >  s.totalW) s.offsetPx -= s.totalW;
+      if (s.offsetPx < -s.totalW) s.offsetPx += s.totalW;
 
-    if (s.dir === 'h') {
       const y = s.y + py;
-      // Start drawing from left, offset by scrolled amount
       let x = -s.offsetPx + px;
-      // Rewind to before screen left
       while (x > 0) x -= s.totalW;
+
+      sctx.textBaseline = 'middle';
+      sctx.textAlign    = 'left';
 
       let idx = 0;
       while (x < W + 200 && idx < s.looped.length * 2) {
         const item = s.looped[idx % s.looped.length];
-        const iw   = s.itemWidths[idx % s.itemWidths.length];
+        const iw   = s.widths[idx % s.widths.length];
         sctx.font = LANG_CONFIG[item.lang].stripFont(s.fontSize);
-        sctx.textAlign = 'left';
-        // gentle fade near screen edges
-        const edgeDist = Math.min(x / (W * 0.12), (W - x) / (W * 0.12), 1);
-        const alpha = s.opacity * Math.max(0.08, edgeDist);
+        // edge fade
+        const edgeFade = Math.min(Math.max((x) / (W*0.1), 0), 1) *
+                         Math.min(Math.max((W - x) / (W*0.1), 0), 1);
+        const alpha = s.opacity * Math.max(0.05, edgeFade);
         sctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
         sctx.fillText(item.text, x, y);
         x += iw;
         idx++;
       }
 
-    } else {
-      // vertical
+    } else if (s.type === 'vr') {
+      // ── vertical rotated — bottom to top ────────
+      // offsetPx moves upward (sign = -1), so we add speed*dt upward
+      s.offsetPx += s.speedPx * dt; // always positive; we flip in drawing
+      if (s.offsetPx > s.totalH) s.offsetPx -= s.totalH;
+
       const x = s.x + px;
-      let y = -s.offsetPx + py;
-      while (y > 0) y -= s.totalH;
+
+      // We rotate the canvas 90° CCW around the strip's x column,
+      // then draw text horizontally — it appears as vertical text
+      // scrolling upward.
+      sctx.save();
+
+      // Translate to strip column center, rotate, then draw
+      // Rotation: -90deg means text reads bottom-to-top
+      sctx.translate(x, H/2 + py);
+      sctx.rotate(-Math.PI / 2);
+      // Now "x" in rotated space = "y" on screen (upward = positive)
+      // Start position in rotated space: offsetPx controls scroll
+      // Items flow from right (+) to left (-) in rotated space = bottom to top on screen
+
+      sctx.textBaseline = 'middle';
+      sctx.textAlign    = 'left';
+
+      // In rotated coords: horizontal extent = H (screen height)
+      // start drawing from -H/2 to +H/2 in rotated space
+      let rx = -(H/2) - s.offsetPx % s.totalH;
+      while (rx > -(H/2)) rx -= s.totalH;
 
       let idx = 0;
-      while (y < H + 60 && idx < s.looped.length * 2) {
+      while (rx < H/2 + 200 && idx < s.looped.length * 2) {
         const item = s.looped[idx % s.looped.length];
-        const ih   = s.itemHeights[idx % s.itemHeights.length];
-        sctx.font = LANG_CONFIG[item.lang].stripFont(s.fontSize);
-        sctx.textAlign = 'center';
-        const edgeDist = Math.min(y / (H * 0.12), (H - y) / (H * 0.12), 1);
-        const alpha = s.opacity * Math.max(0.08, edgeDist);
+        const ih   = s.heights[idx % s.heights.length];
+        sctx.font  = LANG_CONFIG[item.lang].stripFont(s.fontSize);
+        // fade near top/bottom screen edges
+        const screenY = H/2 - rx; // approx screen Y
+        const edgeFade = Math.min(Math.max(screenY / (H*0.1), 0), 1) *
+                         Math.min(Math.max((H - screenY) / (H*0.1), 0), 1);
+        const alpha = s.opacity * Math.max(0.05, edgeFade);
         sctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
-        sctx.fillText(item.text, x, y + ih * 0.5);
-        y += ih;
+        sctx.fillText(item.text, rx, 0);
+        rx += ih;
         idx++;
       }
+
+      sctx.restore();
     }
   });
 }
@@ -417,8 +426,12 @@ function drawStrips(dt) {
 // ═══════════════════════════════════════════════════════
 // THREE.JS — floating single characters
 // ═══════════════════════════════════════════════════════
-const N_ELEMENTS = 160;
-const SPREAD = 12, FLOAT_SPEED = 0.22, BOB_HZ = 0.18, BOB_AMT = 0.10, ROT_MAX = 0.010;
+const N_ELEMENTS  = 160;
+const SPREAD      = 12;
+const FLOAT_SPEED = 0.22;
+const BOB_HZ      = 0.18;
+const BOB_AMT     = 0.10;
+const ROT_MAX     = 0.010;
 let renderer, scene, camera, clock;
 let meshes = [];
 
