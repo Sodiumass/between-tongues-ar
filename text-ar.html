@@ -7,6 +7,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 引入 Noto Serif SC (思源宋体) -->
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 
 <style>
@@ -19,7 +20,7 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
   position:fixed; inset:0; z-index:20;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   background:#f0ede8;
-  color:#111; font-family:monospace;
+  color:#111; font-family:serif;
   text-align:center; padding:48px; gap:10px;
 }
 
@@ -28,7 +29,10 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
   background: linear-gradient(135deg, #E8503A 0%, #4A9EBF 50%, #8BBF3A 100%);
   color:#fff; border:none; font-family:monospace;
   font-size:14px; letter-spacing:0.18em; text-transform:uppercase; cursor:pointer;
+  border-radius: 4px;
 }
+
+.loading-hint { font-size: 11px; color: #999; margin-top: 15px; font-family: monospace; }
 </style>
 </head>
 <body>
@@ -43,148 +47,58 @@ html,body { width:100%; height:100%; overflow:hidden; background:#e8e4df; }
     Making Translanguaging Visible as Embodied Design Practice
   </div>
   <div style="width:32px; height:1px; background:#ccc; margin:16px auto;"></div>
-  <div style="font-size:14px; color:#555; line-height:1.9; max-width:300px;">
-    语言漂浮在我们之间。<br>
-    Language drifts between us.<br>
-    Les langues dérivent entre nous.
+  
+  <div id="loading-msg" style="font-size:14px; color:#555; line-height:1.9; max-width:300px;">
+    正在加载思源宋体...<br>Loading fonts...
   </div>
-  <div style="width:32px; height:1px; background:#ccc; margin:16px auto;"></div>
-  <div style="font-size:16px; letter-spacing:0.18em; text-transform:uppercase; color:#656565; margin-top:8px;">
+
+  <button id="start-btn" onclick="start()" style="display:none;">Enter</button>
+  
+  <div id="swipe-hint" style="display:none; font-size:14px; letter-spacing:0.18em; text-transform:uppercase; color:#656565; margin-top:8px;">
     Swipe to explore different angles
   </div>
-  <button onclick="start()">Enter</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 
-const DPR = Math.min(window.devicePixelRatio || 1, 3);
+const DPR = Math.min(window.devicePixelRatio || 1, 2); // 手机端限制DPR为2，平衡清晰度与性能
 
-// ── TEXT CONTENT ─────────────────────────────────────────
+// ── 完整文字内容恢复 ─────────────────────────────────────────
 
 const TEXTS_ZH = [
-  // 单字
-  '说','听','语','言','我','你','他','间','字','声',
-  '口','心','意','思','话','写','读','懂','找','失',
-  '名','词','句','译','换','借','混','跨','界','边',
-  '沉','默','漂','流','根','土','乡','异','归','离',
-  '脑','舌','喉','气','息','音','调','腔','韵','换',
-  // 偏旁
+  '说','听','语','言','我','你','他','间','字','声','口','心','意','思','话','写','读','懂','找','失','名','词','句','译','换','借','混','跨','界','边','沉','默','漂','流','根','土','乡','异','归','离','脑','舌','喉','气','息','音','调','腔','韵','换',
   '讠','耳','目','手','足','氵','木','人','女','门',
-  // 内心独白 / 语言切换瞬间
-  '等等…','还是说','怎么说','然后','不对',
-  '我不知道怎么翻译','这个词只有中文有',
-  '你懂我的意思吗','说不出来','忘词了',
-  '在哪一种语言里','我才是我自己',
-  '妈妈的语言','学校的语言','梦里的语言',
-  '两种语言之间的沉默','有些话只能用这个说',
-  '我在两种语言之间长大',
-  '翻译不了的感觉','心里想的是中文',
-  '说出来变成了别的','语言在喉咙里打架',
-  '我用哪种语言哭','我用哪种语言笑',
-  '名字被叫错的感觉',
+  '等等…','还是说','怎么说','然后','不对','我不知道怎么翻译','这个词只有中文有','你懂我的意思吗','说不出来','忘词了','在哪一种语言里','我才是我自己','妈妈的语言','学校的语言','梦里的语言','两种语言之间的沉默','有些话只能用这个说','我在两种语言之间长大','翻译不了的感觉','心里想的是中文','说出来变成了别的','语言在喉咙里打架','我用哪种语言哭','我用哪种语言笑','名字被叫错的感觉',
 ];
 
 const TEXTS_FR = [
-  // 单词
-  'langue','dire','entre','mots','jamais',
-  'parler','voix','perdre','trouver','sens',
-  'silence','souffle','frontière','glisser',
-  'appartenir','mémoire','accent','traduire',
-  'manquer','chercher','habiter','corps',
-  'racine','dérive','passage','seuil',
-  'identité','nommer','résonner','naviguer',
-  // 音标/字符
+  'langue','dire','entre','mots','jamais','parler','voix','perdre','trouver','sens','silence','souffle','frontière','glisser','appartenir','mémoire','accent','traduire','manquer','chercher','habiter','corps','racine','dérive','passage','seuil','identité','nommer','résonner','naviguer',
   'é','è','ê','à','â','ç','œ','ô','î','ï',
-  // 对话碎片 / 犹豫瞬间
-  'mais…','c\'est quoi','comment dire',
-  'et alors','ce n\'est pas ça',
-  'je cherche mes mots','tu comprends?',
-  'comment expliquer','c\'est différent',
-  'dans quelle langue je rêve',
-  'je me perds entre les deux',
-  'le mot exact n\'existe pas',
-  'une langue que j\'habite à moitié',
-  'glisser d\'une langue à l\'autre',
-  'ma voix change selon la langue',
-  'les mots me manquent',
-  'je ne suis pas la même personne',
-  'quelque chose se perd','quelque chose reste',
+  'mais…','c\'est quoi','comment dire','et alors','ce n\'est pas ça','je cherche mes mots','tu comprends?','comment expliquer','c\'est différent','dans quelle langue je rêve','je me perds entre les deux','le mot exact n\'existe pas','une langue que j\'habite à moitié','glisser d\'une langue à l\'autre','ma voix change selon la langue','les mots me manquent','je ne suis pas la même personne','quelque chose se perd','quelque chose reste',
 ];
 
 const TEXTS_EN = [
-  // 单词
-  'speak','hear','lost','found','between',
-  'word','tongue','slip','drift','gap',
-  'silence','breath','border','cross',
-  'belong','memory','accent','translate',
-  'switch','code','hybrid','fluid',
-  'root','echo','trace','hold',
-  'inherit','navigate','rupture','carry',
-  // 音标
-  '/ə/','/θ/','/tɕ/','/y/','/ʒ/',
-  '/ɑ/','/œ/','/ɥ/','/ŋ/','/ʁ/',
-  // 字母散落
-  'A','B','Q','Z','X',
-  // 短句 — translanguaging / 身份碎片
-  'sorry…','I mean','how do I say',
-  'and then','that\'s not what I meant',
-  'I think better in—','wait, in which language',
-  'the word doesn\'t exist in English',
-  'I grew up between','lost in translation',
-  'which version of me are you talking to',
-  'my accent gives me away',
-  'I dream in more than one language',
-  'something gets lost','something stays',
-  'a different self in every language',
-  'what doesn\'t translate',
-  'neither here nor there',
-  'the language I inherited',
-  'code-switching in my sleep',
-  'the gap between','the in-between',
+  'speak','hear','lost','found','between','word','tongue','slip','drift','gap','silence','breath','border','cross','belong','memory','accent','translate','switch','code','hybrid','fluid','root','echo','trace','hold','inherit','navigate','rupture','carry',
+  '/ə/','/θ/','/tɕ/','/y/','/ʒ/','/ɑ/','/œ/','/ɥ/','/ŋ/','/ʁ/','A','B','Q','Z','X',
+  'sorry…','I mean','how do I say','and then','that\'s not what I meant','I think better in—','wait, in which language','the word doesn\'t exist in English','I grew up between','lost in translation','which version of me are you talking to','my accent gives me away','I dream in more than one language','something gets lost','something stays','a different self in every language','what doesn\'t translate','neither here nor there','the language I inherited','code-switching in my sleep','the gap between','the in-between',
 ];
 
-// 合并，带语言标记
 const TEXTS_TAGGED = [
   ...TEXTS_ZH.map(t => ({ text: t, lang: 'zh' })),
   ...TEXTS_FR.map(t => ({ text: t, lang: 'fr' })),
   ...TEXTS_EN.map(t => ({ text: t, lang: 'en' })),
 ];
 
-// ── LANGUAGE CONFIG ──────────────────────────────────────
-// 中文宋体fallback链：Noto Serif SC(Google) → STSong(Mac/iOS) → SimSun(Win) → 宋体 → serif
-// 关键：不能出现黑体/无衬线体。如果Noto Serif SC没加载到，
-// STSong和SimSun都是宋体，能正确渲染衬线。
 const SERIF_ZH = '"Noto Serif SC", "STSong", "华文宋体", "SimSun", "宋体", serif';
 
 const LANG_CONFIG = {
-  zh: {
-    fonts: [
-      `{s}px ${SERIF_ZH}`,
-      `bold {s}px ${SERIF_ZH}`,
-    ],
-    colors: ['#e84545','#d63a3a','#f05555','#c93030','#e86060','#bf2a2a','#f07070'],
-  },
-  fr: {
-    fonts: [
-      `italic {s}px "Georgia", "Times New Roman", serif`,
-      `italic bold {s}px "Georgia", serif`,
-      `italic {s}px "Times New Roman", serif`,
-    ],
-    colors: ['#4a8fd9','#3a7ec8','#5a9fe8','#2d72bb','#6aaee8','#1f5fa0','#7bbcf0'],
-  },
-  en: {
-    fonts: [
-      `{s}px "Courier Prime", "Courier New", monospace`,
-      `bold {s}px "Courier Prime", monospace`,
-      `italic {s}px "Courier Prime", monospace`,
-      `bold italic {s}px "Courier Prime", monospace`,
-    ],
-    colors: ['#8fcc3b','#7db82e','#9fd948','#6aa022','#aad960','#5a8c18','#b8e655'],
-  },
+  zh: { fonts: [`{s}px ${SERIF_ZH}`, `bold {s}px ${SERIF_ZH}`], colors: ['#e84545','#d63a3a','#f05555','#c93030','#e86060','#bf2a2a','#f07070'] },
+  fr: { fonts: [`italic {s}px "Georgia", serif`, `italic {s}px "Times New Roman", serif`], colors: ['#4a8fd9','#3a7ec8','#5a9fe8','#2d72bb','#6aaee8','#1f5fa0','#7bbcf0'] },
+  en: { fonts: [`{s}px "Courier Prime", monospace`, `bold {s}px "Courier Prime", monospace`], colors: ['#8fcc3b','#7db82e','#9fd948','#6aa022','#aad960','#5a8c18','#b8e655'] },
 };
 
-// ── CONFIG ───────────────────────────────────────────────
+// ── 动画参数 ───────────────────────────────────────────────
 const N_ELEMENTS  = 180;
 const SPREAD      = 12;
 const SPEED       = 0.22;
@@ -192,55 +106,57 @@ const BOB_HZ      = 0.18;
 const BOB_AMT     = 0.10;
 const ROT_MAX     = 0.010;
 
-// ── STATE ────────────────────────────────────────────────
-let renderer, scene, camera, clock;
-let meshes = [];
-let dragYaw = 0, dragPitch = 0;
-let pointerDown = false, lastPX = 0, lastPY = 0;
+let renderer, scene, camera, clock, meshes = [];
+let dragYaw = 0, dragPitch = 0, pointerDown = false, lastPX = 0, lastPY = 0;
 
-// ── MAKE TEXT TEXTURE ────────────────────────────────────
+// ── 字体预加载锁 ──────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // 关键：强制等待思源宋体加载完成
+        await document.fonts.load('12px "Noto Serif SC"');
+        document.getElementById('loading-msg').innerHTML = '语言漂浮在我们之间。<br>Language drifts between us.<br>Les langues dérivent entre nous.';
+        document.getElementById('start-btn').style.display = 'block';
+        document.getElementById('swipe-hint').style.display = 'block';
+    } catch(e) {
+        // 如果加载失败（如网络问题），直接显示按钮尝试运行
+        document.getElementById('start-btn').style.display = 'block';
+    }
+});
+
 function makeTexture(tagged) {
   const { text, lang } = tagged;
   const cfg = LANG_CONFIG[lang];
-
-  const c   = document.createElement('canvas');
+  const c = document.createElement('canvas');
   const ctx = c.getContext('2d');
 
-  // 短句字号小一点，单字/音标大一点
   const isSentence = text.length > 5;
-  const minSize = isSentence ? 18 : 28;
-  const maxSize = isSentence ? 32 : 52;
-  const logicalSize = minSize + Math.floor(Math.random() * (maxSize - minSize));
-  const physSize    = Math.round(logicalSize * DPR); // 物理像素，解决Retina模糊
+  const logicalSize = isSentence ? 22 : 38;
+  const physSize = Math.round(logicalSize * DPR);
 
   const fontTpl = cfg.fonts[Math.floor(Math.random() * cfg.fonts.length)];
-  const font    = fontTpl.replace('{s}', physSize);
-  const color   = cfg.colors[Math.floor(Math.random() * cfg.colors.length)];
+  const font = fontTpl.replace('{s}', physSize);
 
+  // 1. 设置字体测量宽度
   ctx.font = font;
   const metrics = ctx.measureText(text);
   const tw = Math.ceil(metrics.width) + Math.ceil(physSize * 0.6);
   const th = Math.ceil(physSize * 1.6);
 
-  c.width  = Math.max(tw, 4);
+  // 2. 这里的宽高赋值会重置 Canvas 状态
+  c.width = Math.max(tw, 4);
   c.height = Math.max(th, 4);
 
-  // canvas resize后必须重设font，否则会用默认font重画
-  ctx.clearRect(0, 0, c.width, c.height);
-  ctx.font         = font;
-  ctx.fillStyle    = color;
-  ctx.textAlign    = 'center';
+  // 3. 必须在设置宽厚之后重新设置状态
+  ctx.font = font; 
+  ctx.fillStyle = cfg.colors[Math.floor(Math.random() * cfg.colors.length)];
+  ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, c.width / 2, c.height / 2);
 
   const tex = new THREE.CanvasTexture(c);
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-
   return { tex, ratio: c.height / c.width, isSentence };
 }
 
-// ── START ────────────────────────────────────────────────
 async function start() {
   document.getElementById('ui').style.display = 'none';
 
@@ -249,104 +165,71 @@ async function start() {
       video:{ facingMode:{ideal:'environment'} }, audio:false
     });
     document.getElementById('cam').srcObject = s;
-  } catch(e) {}
+  } catch(e) { console.log("Camera failed", e); }
 
   const canvas = document.getElementById('three-canvas');
-  const isAndroid = /android/i.test(navigator.userAgent);
-
-  renderer = new THREE.WebGLRenderer({
-    canvas, alpha:true, antialias:true, powerPreference:'high-performance'
-  });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isAndroid ? 1.5 : 2));
+  renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+  renderer.setPixelRatio(DPR);
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setClearColor(0x000000, 0);
 
-  scene  = new THREE.Scene();
+  scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 100);
   camera.position.set(0, 0, 6);
-  clock  = new THREE.Clock();
+  clock = new THREE.Clock();
 
+  // 响应式监听
   window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
   });
 
+  // 交互支持（手机触屏）
   const el = renderer.domElement;
-  el.addEventListener('pointerdown', e => { pointerDown=true; lastPX=e.clientX; lastPY=e.clientY; });
-  window.addEventListener('pointerup',     () => pointerDown=false);
-  window.addEventListener('pointercancel', () => pointerDown=false);
-  window.addEventListener('pointermove', e => {
+  const onDown = e => { pointerDown=true; const p = e.touches ? e.touches[0] : e; lastPX=p.clientX; lastPY=p.clientY; };
+  const onMove = e => {
     if (!pointerDown) return;
-    dragYaw   -= (e.clientX - lastPX) * 0.004;
-    dragPitch -= (e.clientY - lastPY) * 0.002;
-    dragPitch  = Math.max(-0.5, Math.min(0.5, dragPitch));
-    lastPX = e.clientX; lastPY = e.clientY;
-  });
+    const p = e.touches ? e.touches[0] : e;
+    dragYaw -= (p.clientX - lastPX) * 0.004;
+    dragPitch -= (p.clientY - lastPY) * 0.002;
+    dragPitch = Math.max(-0.5, Math.min(0.5, dragPitch));
+    lastPX = p.clientX; lastPY = p.clientY;
+  };
+  el.addEventListener('touchstart', onDown);
+  window.addEventListener('touchend', () => pointerDown=false);
+  window.addEventListener('touchmove', onMove);
 
-  // 等字体加载完再spawn
-  await document.fonts.ready;
-
-  // 检测Noto Serif SC是否真的加载成功
-  // 未加载成功时去掉它，让fallback走STSong/SimSun（都是宋体，不是黑体）
-  let notoLoaded = false;
-  try { notoLoaded = document.fonts.check('400 12px "Noto Serif SC"'); } catch(e) {}
-
-  if (!notoLoaded) {
-    LANG_CONFIG.zh.fonts = [
-      `{s}px "STSong", "华文宋体", "SimSun", "宋体", serif`,
-      `bold {s}px "STSong", "SimSun", "宋体", serif`,
-    ];
-  }
-
-  // spawn
+  // 生成粒子
   for (let i = 0; i < N_ELEMENTS; i++) {
     const tagged = TEXTS_TAGGED[i % TEXTS_TAGGED.length];
     const { tex, ratio, isSentence } = makeTexture(tagged);
 
-    // 短句给更宽的平面
-    const sizeVar = isSentence
-      ? 0.9 + Math.random() * 0.8
-      : 0.4 + Math.random() * 0.9;
+    const sizeVar = isSentence ? 0.9 + Math.random() * 0.8 : 0.4 + Math.random() * 0.9;
     const w = sizeVar * 1.4;
     const h = w * ratio;
 
     const geo = new THREE.PlaneGeometry(w, h);
     const baseOpacity = 0.55 + Math.random() * 0.45;
     const mat = new THREE.MeshBasicMaterial({
-      map: tex, transparent:true, depthWrite:false,
-      side: THREE.DoubleSide,
-      opacity: baseOpacity,
+      map: tex, transparent:true, depthWrite:false, side: THREE.DoubleSide, opacity: baseOpacity,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = Math.random();
 
-    mesh.position.set(
-      (Math.random()-0.5) * SPREAD * 2,
-      (Math.random()-0.5) * SPREAD,
-      (Math.random()-0.5) * SPREAD * 1.8
-    );
-    mesh.rotation.set(
-      (Math.random()-0.5) * Math.PI * 0.5,
-      (Math.random()-0.5) * Math.PI * 0.7,
-      (Math.random()-0.5) * Math.PI * 0.3
-    );
-
-    const angle = Math.random() * Math.PI * 2;
-    const spd   = SPEED * (0.4 + Math.random() * 0.9);
+    mesh.position.set((Math.random()-0.5)*SPREAD*2, (Math.random()-0.5)*SPREAD, (Math.random()-0.5)*SPREAD*1.8);
+    mesh.rotation.set((Math.random()-0.5)*Math.PI, (Math.random()-0.5)*Math.PI, 0);
 
     mesh.userData = {
-      vx: Math.cos(angle) * spd,
-      vy: (Math.random()-0.5) * spd * 0.3,
-      vz: (Math.random()-0.5) * spd * 0.2,
+      vx: (Math.random() > 0.5 ? 1 : -1) * SPEED * (0.4 + Math.random()),
+      vy: (Math.random()-0.5) * SPEED * 0.3,
+      vz: (Math.random()-0.5) * SPEED * 0.2,
       rx: (Math.random()-0.5) * 2 * ROT_MAX,
       ry: (Math.random()-0.5) * 2 * ROT_MAX * 1.5,
       rz: (Math.random()-0.5) * 2 * ROT_MAX * 0.6,
       bobPhase: Math.random() * Math.PI * 2,
-      bobRate:  0.6 + Math.random() * 0.8,
-      baseY:    mesh.position.y,
+      bobRate: 0.6 + Math.random() * 0.8,
+      baseY: mesh.position.y,
       wobblePhase: Math.random() * Math.PI * 2,
-      wobbleAmt:   (Math.random()-0.5) * 0.06,
+      wobbleAmt: (Math.random()-0.5) * 0.06,
       baseOpacity,
     };
 
@@ -357,19 +240,18 @@ async function start() {
   animate();
 }
 
-// ── ANIMATE ──────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
-  const t  = clock.getElapsedTime();
-  const H  = SPREAD;
+  const t = clock.getElapsedTime();
+  const H = SPREAD;
 
   meshes.forEach(m => {
     const d = m.userData;
     const wobble = Math.sin(t * 0.4 + d.wobblePhase) * d.wobbleAmt;
 
     m.position.x += (d.vx + wobble) * dt;
-    m.position.y  = d.baseY + Math.sin(t * BOB_HZ * d.bobRate * Math.PI*2 + d.bobPhase) * BOB_AMT;
+    m.position.y = d.baseY + Math.sin(t * BOB_HZ * d.bobRate * Math.PI*2 + d.bobPhase) * BOB_AMT;
     m.position.z += d.vz * dt;
 
     m.rotation.x += d.rx * dt * 60;
@@ -377,16 +259,14 @@ function animate() {
     m.rotation.z += d.rz * dt * 60;
 
     const lim = H * 2;
-    if (m.position.x >  lim) { m.position.x = -lim; d.baseY = (Math.random()-0.5)*H; }
-    if (m.position.x < -lim) { m.position.x =  lim; d.baseY = (Math.random()-0.5)*H; }
-    if (m.position.z >  H*2) m.position.z = -H*2;
-    if (m.position.z < -H*2) m.position.z =  H*2;
+    if (m.position.x > lim) m.position.x = -lim;
+    if (m.position.x < -lim) m.position.x = lim;
 
     const depth = (m.position.z + H*1.5) / (H*3.0);
-    m.material.opacity = Math.max(0.08, Math.min(0.95, d.baseOpacity * (0.35 + depth * 0.65)));
+    m.material.opacity = Math.max(0.1, Math.min(0.9, d.baseOpacity * (0.3 + depth * 0.7)));
   });
 
-  camera.rotation.y += (dragYaw   - camera.rotation.y) * 0.08;
+  camera.rotation.y += (dragYaw - camera.rotation.y) * 0.08;
   camera.rotation.x += (dragPitch - camera.rotation.x) * 0.08;
 
   renderer.render(scene, camera);
